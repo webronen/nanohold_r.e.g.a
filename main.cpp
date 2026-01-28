@@ -38,30 +38,6 @@ void loop() {
   state.buttons = (PressStep)(((!(NRF_P0->IN & (1 << GPIO_LEFT_BUTTON))) << 1) |  //
                               ((!(NRF_P1->IN & (1 << GPIO_RIGHT_BUTTON))) << 0));
 
-  if (state.open) {
-
-    // static VL53L4CD_RawResult_t result = { 0 };
-    // vl53l4cd.VL53L4CD_GetRawResult(&result);
-
-    // static uint8_t object_samples = 0;
-
-    // const bool object_detected =
-    //   (result.range_status == 9u) && (__builtin_bswap16(result.distance) < AUTO_DISTANCE_MM);
-
-    // if (object_detected) {
-    //   vl53l4cd.VL53L4CD_ClearInterruptAndStopRanging();
-    //   vl53l4cd.VL53L4CD_StartRanging();
-    //   object_samples++;
-    // } else
-    //   object_samples = 0;
-
-    // if (object_samples >= 5) {
-    //   object_samples = 0;
-    //   state.mode == AUTO;
-    // }
-  }
-
-  // Priority: MANUAL > AUTO > IDLE
   if (state.buttons != IDLE) state.mode = MANUAL, state.step = state.buttons;
   else if (state.mode == AUTO && state.step == IDLE) state.step = UP;
   if (state.step != IDLE) prepare_active_state();
@@ -125,22 +101,41 @@ static inline void prepare_active_state(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
-    // vl53l4cd.VL53L4CD_SensorInit();
-    // vl53l4cd.VL53L4CD_StartRanging();
+    sensor.VL53L4CD_SensorInit();
+    sensor.VL53L4CD_StartRanging();
 
-    Serial.println("Torque enabled!");
-    // scs0009.EnableTorque(SCS0009_DEFAULT_ID, true);
+    // servo.EnableTorque(SERVO_DEFAULT_ID, true);
   }
 }
 
 static inline void handle_idle_state(void) {
 
-  if (state.idle_us == 0)
-    state.idle_us = state.time_us;
+  if (state.open) {
 
-  if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)M_TO_US(1) &&  //
+    static VL53L4CD_RawResult_t result = { 0 };
+    static uint8_t object_samples = 0;
+    uint8_t data_ready;
+
+    if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
+
+      sensor.VL53L4CD_GetRawResult(&result);
+      sensor.VL53L4CD_ClearInterruptAndStopRanging();
+      sensor.VL53L4CD_StartRanging();
+
+      if (result.range_status == 9 && __builtin_bswap16(result.distance) < AUTO_DISTANCE_MM) {
+        if (++object_samples >= AUTO_TRIGGER_SAMPLES)
+          object_samples = 0, state.mode = AUTO, Serial.println("Auto: Object detected!");
+      } else
+        object_samples = 0;
+    }
+  }
+
+  if (state.idle_us == 0) state.idle_us = state.time_us;
+
+  if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)POWER_TIMEOUT_M &&  //
       NRF_P0->DIR & (1 << GPIO_STATUS_PIN)) {
 
+    Serial.println("Power disabled!");
     NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                       (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
 
@@ -157,10 +152,10 @@ static inline void handle_press_up(void) {
   else if (!state.latch)
     state.latch = true, state.open = true, delay(1000);
 
-  // if ((state.open = (scs0009.ReadPos(SCS0009_DEFAULT_ID) >= PRESS_UP_POSITION)))
+  // if ((state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION)))
   //   state.step = (state.mode == AUTO) ? DOWN : IDLE, state.latch = false;
   // else if (!state.latch)
-  //   state.latch = true, scs0009.WritePos(SCS0009_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
+  //   state.latch = true, servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
 }
 
 static inline void handle_press_down(void) {
@@ -172,8 +167,8 @@ static inline void handle_press_down(void) {
   else if (!state.latch)
     state.latch = true, state.open = false, delay(1000);
 
-  // if (!(state.open = !(scs0009.ReadLoad(SCS0009_DEFAULT_ID) >= PRESS_LOAD_LIMIT)))
+  // if (!(state.open = !(servo.ReadLoad(SERVO_DEFAULT_ID) >= PRESS_LOAD_LIMIT)))
   //   state.mode = MANUAL, state.step = IDLE, state.latch = false;
   // else if (!state.latch)
-  //   state.latch = true, scs0009.WritePos(SCS0009_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
+  //   state.latch = true, servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
 }
