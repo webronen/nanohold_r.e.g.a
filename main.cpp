@@ -140,9 +140,6 @@ static inline void handle_idle_state(void) {
 
   if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)M_TO_US(1) &&  //
       NRF_P0->DIR & (1 << GPIO_STATUS_PIN)) {
-    Serial.println("Torque disabled!");
-    // scs0009.WritePos(SCS0009_DEFAULT_ID, PRESS_UP_POSITION, 0u, PRESS_UP_SPEED)
-    /* scs0009.EnableTorque(SCS0009_DEFAULT_ID, false); */
 
     NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                       (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
