@@ -10,8 +10,8 @@
 #define HZ_TO_US(hz) (1000000UL / (hz))
 #define M_TO_US(m) ((m)*60 * 1000000UL)
 #define S_TO_US(s) ((s)*1000000UL)
-#define DISTANCE_LPF 0.75f
 
+#define POWER_TIMEOUT_M M_TO_US(5)
 #define LDO_ENABLE_PIN 13
 #define SERIAL_BAUDRATE_1M 1000000
 #define I2C_FREQUENCY_400K 400000
@@ -19,12 +19,13 @@
 #define I2C_SDA_PIN 38
 
 #define AUTO_DISTANCE_MM 30
+#define AUTO_TRIGGER_SAMPLES 5
 
 #define GPIO_STATUS_PIN 11   // P0.11
 #define GPIO_RIGHT_BUTTON 0  // P1.00
 #define GPIO_LEFT_BUTTON 24  // P0.24
 
-#define SCS0009_DEFAULT_ID 1
+#define SERVO_DEFAULT_ID 1
 
 #define PRESS_UP_POSITION 0    // ?
 #define PRESS_DOWN_POSITION 0  // ?
