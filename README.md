@@ -18,7 +18,7 @@ User intervention immediately takes priority:
 - **Solid Green LED**: Actively opening/moving upward
 - **Solid Red LED**: Actively closing/pressing downward  
 - **Fast Blinking LED**: Reset sequence active (both buttons held)
-- **No LED**: System idle or motor power disabled
+- **No LED**: System idle or power disabled
 
 ## Safety & Protection Features
 - **Emergency Reset**: Hold both buttons for 5 seconds to trigger system reboot
