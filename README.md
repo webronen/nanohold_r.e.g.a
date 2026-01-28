@@ -22,7 +22,7 @@ User intervention immediately takes priority:
 
 ## Safety & Protection Features
 - **Emergency Reset**: Hold both buttons for 5 seconds to trigger system reboot
-- **Power Management**: Motors automatically disable after 1 minute of inactivity
+- **Power Management**: Power automatically disable after 1 minute of inactivity
 - **Command Protection**: Prevents duplicate movement commands with latch mechanism
 - **Force Limiting**: Stops downward motion when predetermined pressure threshold reached
 
