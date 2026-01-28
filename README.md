@@ -30,3 +30,6 @@ User intervention immediately takes priority:
 - Manual control always overrides automatic operation
 - Each mode completes its current action before transitioning states
 - System maintains last known position/force state between operations
+
+## 3D Model
+- [NANOHOLD R.E.G.A](https://makerworld.com/en/models/2253633-nanohold-r-e-g-a)
