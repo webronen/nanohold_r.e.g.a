@@ -90,9 +90,9 @@ static inline void handle_idle_state(void) {
   //     sensor_debounce = (sensor_debounce << 1) | (object_detected ? 1 : 0);
 
   //     if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
-  //       state.mode = AUTO;
   //       sensor_debounce = 0;
-  //       Serial.println("Auto: Object detected!");
+  //       state.mode = AUTO;
+  //       Serial.println("[IDLE] -> Object detected. Changed mode to AUTO.");
   //     }
   //   }
   // }
@@ -115,11 +115,22 @@ static inline void handle_idle_state(void) {
 
   if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)SLEEP_TIMEOUT_M &&  //
       (NRF_P0->PIN_CNF[GPIO_STATUS_PIN] & GPIO_PIN_CNF_INPUT_Msk) == GPIO_PIN_CNF_INPUT_Msk) {
-    // TODO: Implement full system shutdown (~3µA)
 
     Serial.println("[IDLE] -> Shutting down the system.");
-    Serial.flush();
     delay(1000);
+
+    Serial.flush();
+    Serial.end();
+    Wire.end();
+
+    for (uint8_t i = 0; i < 32; i++)
+      NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    for (uint8_t i = 1; i < 16; i++)
+      NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    NRF_CLOCK->TASKS_HFCLKSTOP = 1;
+    NRF_CLOCK->TASKS_LFCLKSTOP = 1;
 
     __DMB();
     __DSB();
