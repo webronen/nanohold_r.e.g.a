@@ -45,44 +45,6 @@ void loop() {
   state_handle[state.step < HALT ? state.step : HALT]();
 }
 
-static void handle_halt_state(void) {
-
-  static uint32_t previous_us = 0;
-
-  if ((int32_t)(state.time_us - previous_us) >= 0) {
-    NRF_P0->OUT ^= (1 << GPIO_STATUS_PIN);
-    previous_us += state.halt_us == 0 ? HZ_TO_US(12) : state.halt_us;
-  }
-}
-
-static inline void handle_reset_state(void) {
-
-  static uint32_t previous_us = 0;
-
-  if (state.buttons != RESET)
-    previous_us = 0;
-  else if (previous_us == 0)
-    previous_us = state.time_us;
-
-  const uint32_t elapsed_us = previous_us ? (state.time_us - previous_us) : 0;
-
-  if ((previous_us == 0) || (elapsed_us < S_TO_US(4)))
-    state.halt_us = HZ_TO_US(12);
-  else if (elapsed_us < S_TO_US(5))
-    state.halt_us = HZ_TO_US(120);
-  else {
-    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
-    NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-    delay(1000);
-    __DMB();
-    __NVIC_SystemReset();
-    while (true)
-      ;
-  }
-
-  handle_halt_state();
-}
-
 static inline void prepare_active_state(void) {
 
   state.idle_us = 0;
@@ -173,4 +135,42 @@ static inline void handle_down_state(void) {
   //   state.mode = MANUAL, state.step = IDLE, state.latch = false;
   // else if (!state.latch)
   //   state.latch = true, servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
+}
+
+static inline void handle_reset_state(void) {
+
+  static uint32_t previous_us = 0;
+
+  if (state.buttons != RESET)
+    previous_us = 0;
+  else if (previous_us == 0)
+    previous_us = state.time_us;
+
+  const uint32_t elapsed_us = previous_us ? (state.time_us - previous_us) : 0;
+
+  if ((previous_us == 0) || (elapsed_us < S_TO_US(4)))
+    state.halt_us = HZ_TO_US(12);
+  else if (elapsed_us < S_TO_US(5))
+    state.halt_us = HZ_TO_US(120);
+  else {
+    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+    NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+    delay(1000);
+    __DMB();
+    __NVIC_SystemReset();
+    while (true)
+      ;
+  }
+
+  handle_halt_state();
+}
+
+static void handle_halt_state(void) {
+
+  static uint32_t previous_us = 0;
+
+  if ((int32_t)(state.time_us - previous_us) >= 0) {
+    NRF_P0->OUT ^= (1 << GPIO_STATUS_PIN);
+    previous_us += state.halt_us == 0 ? HZ_TO_US(12) : state.halt_us;
+  }
 }
