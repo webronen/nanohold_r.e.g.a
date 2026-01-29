@@ -41,7 +41,7 @@ void loop() {
 
   static uint8_t button_debounce = 0;
   button_debounce = (button_debounce << 1) | (state.buttons ? 1 : 0);
-  if ((button_debounce & BUTTON_DEBOUNCE_MASK) != BUTTON_DEBOUNCE_MASK) state.buttons = IDLE;
+  if ((button_debounce & BUTTON_DEBOUNCE_Msk) != BUTTON_DEBOUNCE_Msk) state.buttons = IDLE;
 
   if (state.buttons != IDLE) state.mode = MANUAL, state.step = state.buttons;
   else if (state.mode == AUTO && state.step == IDLE) state.step = UP;
@@ -89,7 +89,7 @@ static inline void handle_idle_state(void) {
   //     const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
   //     sensor_debounce = (sensor_debounce << 1) | (object_detected ? 1 : 0);
 
-  //     if ((sensor_debounce & SENSOR_DEBOUNCE_MASK) == SENSOR_DEBOUNCE_MASK) {
+  //     if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
   //       state.mode = AUTO;
   //       sensor_debounce = 0;
   //       Serial.println("Auto: Object detected!");
