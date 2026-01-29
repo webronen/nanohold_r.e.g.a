@@ -11,7 +11,9 @@
 #define M_TO_US(m) ((m)*60 * 1000000UL)
 #define S_TO_US(s) ((s)*1000000UL)
 
-#define POWER_TIMEOUT_M M_TO_US(5)
+#define IDLE_TIMEOUT_M M_TO_US(1)
+#define SLEEP_TIMEOUT_M M_TO_US(5)
+
 #define LDO_ENABLE_PIN 13
 #define SERIAL_BAUDRATE_1M 1000000
 #define I2C_FREQUENCY_400K 400000
@@ -31,41 +33,55 @@
 #define PRESS_DOWN_POSITION 0  // ?
 #define PRESS_LOAD_LIMIT 0     // ?
 
+#define PRESS_STATE_COUNT 5
 #define PRESS_UP_SPEED 150
 #define PRESS_DOWN_SPEED 300
 
 VL53L4CD sensor(&Wire, -1);
 SCSCL servo;
 
+typedef void (*StateHandle)(void);
+
 typedef enum {
   MANUAL = 0,
   AUTO = 1,
-} PressMode;
+} PressMode_t;
 
 typedef enum {
   IDLE = 0,
   UP = 1,
   DOWN = 2,
-  RESET = 3
-} PressStep;
+  RESET = 3,
+  HALT = 4,
+} PressStep_t;
 
 typedef struct {
-  PressMode mode;
-  PressStep step;
-  PressStep buttons;
   uint32_t time_us;
   uint32_t idle_us;
+  uint32_t halt_us;
+  PressMode_t mode;
+  PressStep_t step;
+  PressStep_t buttons;
   bool open;
   bool latch;
-} PressState;
+} PressState_t;
 
-static PressState state = { .mode = AUTO };
+static PressState_t state = { .mode = AUTO };
 
-static void blink_status_leds(const uint32_t interval_us);
-static inline void handle_reset_state(void);
 static inline void prepare_active_state(void);
+
 static inline void handle_idle_state(void);
-static inline void handle_press_up(void);
-static inline void handle_press_down(void);
+static inline void handle_up_state(void);
+static inline void handle_down_state(void);
+static inline void handle_reset_state(void);
+static inline void handle_halt_state(void);
+
+static const StateHandle state_handle[PRESS_STATE_COUNT] = {
+  [IDLE] = handle_idle_state,
+  [UP] = handle_up_state,
+  [DOWN] = handle_down_state,
+  [RESET] = handle_reset_state,
+  [HALT] = handle_halt_state
+};
 
 #endif  // MAIN_H
