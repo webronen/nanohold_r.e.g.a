@@ -12,7 +12,7 @@
 #define S_TO_US(s) ((s)*1000000UL)
 
 #define IDLE_TIMEOUT_M M_TO_US(1)
-#define SLEEP_TIMEOUT_M M_TO_US(2)
+#define SLEEP_TIMEOUT_M M_TO_US(5)
 
 #define LDO_ENABLE_PIN 13
 #define SERIAL_BAUDRATE_1M 1000000
@@ -72,6 +72,7 @@ typedef struct {
 
 static PressState_t state = { .mode = AUTO };
 
+static inline void disconnect_gpio_ports(void);
 static inline void prepare_active_state(void);
 
 static inline void handle_idle_state(void);
