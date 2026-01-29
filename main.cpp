@@ -56,11 +56,16 @@ static inline void prepare_active_state(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
+    for (uint8_t i = 0; i < 120; i++) {
+      NRF_P0->OUT ^= (1 << GPIO_STATUS_PIN);
+      delayMicroseconds(8333);
+    }
+
     // sensor.VL53L4CD_SensorInit();
     // sensor.VL53L4CD_StartRanging();
 
     // servo.EnableTorque(SERVO_DEFAULT_ID, true);
-    Serial.println("[ACTIVE] => Entered active state");
+    Serial.println("[ACTIVE] => Switched to active mode");
   }
 }
 
@@ -86,7 +91,10 @@ static inline void handle_idle_state(void) {
   //   }
   // }
 
-  if (state.idle_us == 0) state.idle_us = state.time_us;
+  if (state.idle_us == 0) {
+    state.idle_us = state.time_us;
+    Serial.println("[IDLE] => Switched to idle mode");
+  }
 
   if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)IDLE_TIMEOUT_M &&  //
       (NRF_P0->DIR & (1 << GPIO_STATUS_PIN))) {
@@ -96,18 +104,24 @@ static inline void handle_idle_state(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-    Serial.println("[IDLE] => Sensor and servo shutdown");
+    Serial.println("[IDLE] => Turning off connected devices");
   }
 
   if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)SLEEP_TIMEOUT_M &&  //
       (NRF_P0->PIN_CNF[GPIO_STATUS_PIN] & GPIO_PIN_CNF_INPUT_Msk) == GPIO_PIN_CNF_INPUT_Msk) {
     // TODO: Implement full system shutdown (~3µA)
-    Serial.println("[IDLE] => System shutdown");
-    Serial.flush();
+
+    NRF_P0->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |     //
+                                        (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos) |  //
+                                        (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+
+    Serial.println("[IDLE] => Shutting down the system");
+    delay(1);
+
     __DMB();
     __DSB();
     __ISB();
-    // NRF_POWER->SYSTEMOFF = POWER_SYSTEMOFF_SYSTEMOFF_Enter;
+    NRF_POWER->SYSTEMOFF = POWER_SYSTEMOFF_SYSTEMOFF_Enter;
     while (true)
       ;
   }
@@ -117,10 +131,15 @@ static inline void handle_up_state(void) {
 
   NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
 
-  if (state.open)
-    state.step = (state.mode == AUTO) ? DOWN : IDLE, state.latch = false;
-  else if (!state.latch)
-    state.latch = true, state.open = true, delay(1000);
+  if (state.open) {
+    state.step = (state.mode == AUTO) ? DOWN : IDLE;
+    state.latch = false;
+  } else if (!state.latch) {
+    state.latch = true;
+    state.open = true;
+    Serial.println("[UP] => Moving up");
+    delay(1);
+  }
 
   // if ((state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION)))
   //   state.step = (state.mode == AUTO) ? DOWN : IDLE, state.latch = false;
@@ -132,10 +151,16 @@ static inline void handle_down_state(void) {
 
   NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
 
-  if (!state.open)
-    state.mode = MANUAL, state.step = IDLE, state.latch = false;
-  else if (!state.latch)
-    state.latch = true, state.open = false, delay(1000);
+  if (!state.open) {
+    state.mode = MANUAL;
+    state.step = IDLE;
+    state.latch = false;
+  } else if (!state.latch) {
+    state.latch = true;
+    state.open = false;
+    Serial.println("[DOWN] => Moving down");
+    delay(1);
+  }
 
   // if (!(state.open = !(servo.ReadLoad(SERVO_DEFAULT_ID) >= PRESS_LOAD_LIMIT)))
   //   state.mode = MANUAL, state.step = IDLE, state.latch = false;
@@ -147,9 +172,9 @@ static inline void handle_reset_state(void) {
 
   static uint32_t previous_us = 0;
 
-  if (state.buttons != RESET)
+  if (state.buttons != RESET) {
     previous_us = 0;
-  else if (previous_us == 0)
+  } else if (previous_us == 0)
     previous_us = state.time_us;
 
   const uint32_t elapsed_us = previous_us ? (state.time_us - previous_us) : 0;
@@ -159,9 +184,14 @@ static inline void handle_reset_state(void) {
   else if (elapsed_us < S_TO_US(5))
     state.halt_us = HZ_TO_US(120);
   else {
-    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
+                                      (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    Serial.println("[RESET] => Resetting the system");
     delay(1000);
+
     __DMB();
     __DSB();
     __ISB();
