@@ -2,6 +2,8 @@
 
 void setup() {
 
+  disconnect_gpio_ports();
+
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                     (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
 
@@ -47,6 +49,15 @@ void loop() {
   if (state.step != IDLE) prepare_active_state();
 
   state_handle[state.step < HALT ? state.step : HALT]();
+}
+
+static inline void disconnect_gpio_ports(void) {
+
+  for (uint8_t i = 0; i < 32; i++)
+    NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+  for (uint8_t i = 0; i < 16; i++)
+    NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 }
 
 static inline void prepare_active_state(void) {
@@ -122,23 +133,24 @@ static inline void handle_idle_state(void) {
     Serial.end();
     Wire.end();
 
-    for (uint8_t i = 0; i < 32; i++)
-      NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
-    for (uint8_t i = 0; i < 16; i++)
-      NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+    disconnect_gpio_ports();
 
     NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |     //
                                         (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos) |  //
                                         (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
 
-    NRF_CLOCK->TASKS_HFCLKSTOP = 1;
-    NRF_CLOCK->TASKS_LFCLKSTOP = 1;
+    NRF_CLOCK->TASKS_HFCLKSTOP = CLOCK_TASKS_HFCLKSTOP_TASKS_HFCLKSTOP_Trigger;
+    while (NRF_CLOCK->EVENTS_HFCLKSTARTED)
+      ;
+
+    NRF_CLOCK->TASKS_LFCLKSTOP = CLOCK_TASKS_LFCLKSTOP_TASKS_LFCLKSTOP_Trigger;
+    while (NRF_CLOCK->EVENTS_LFCLKSTARTED)
+      ;
 
     __DMB();
     __DSB();
     __ISB();
-    
+
     NRF_POWER->SYSTEMOFF = POWER_SYSTEMOFF_SYSTEMOFF_Enter;
     while (true)
       ;
@@ -222,7 +234,7 @@ static inline void handle_reset_state(void) {
   handle_halt_state();
 }
 
-static void handle_halt_state(void) {
+static inline void handle_halt_state(void) {
 
   static uint32_t previous_us = 0;
 
