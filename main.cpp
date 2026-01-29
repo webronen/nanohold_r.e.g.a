@@ -21,7 +21,7 @@ void setup() {
   NRF_TIMER0->PRESCALER = 4;
   NRF_TIMER0->TASKS_START = 1;
 
-  Wire.setPins(I2C_CLK_PIN, I2C_SDA_PIN);
+  Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
@@ -35,29 +35,23 @@ void loop() {
   NRF_TIMER0->TASKS_CAPTURE[0] = 1;
   state.time_us = NRF_TIMER0->CC[0];
 
-  state.buttons = (PressStep)(((!(NRF_P0->IN & (1 << GPIO_LEFT_BUTTON))) << 1) |  //
-                              ((!(NRF_P1->IN & (1 << GPIO_RIGHT_BUTTON))) << 0));
+  state.buttons = (PressStep_t)(((!(NRF_P0->IN & (1 << GPIO_LEFT_BUTTON))) << 1) |  //
+                                ((!(NRF_P1->IN & (1 << GPIO_RIGHT_BUTTON))) << 0));
 
   if (state.buttons != IDLE) state.mode = MANUAL, state.step = state.buttons;
   else if (state.mode == AUTO && state.step == IDLE) state.step = UP;
   if (state.step != IDLE) prepare_active_state();
 
-  switch (state.step) {
-    case IDLE: handle_idle_state(); break;
-    case UP: handle_press_up(); break;
-    case DOWN: handle_press_down(); break;
-    case RESET: handle_reset_state(); break;
-    default: blink_status_leds(HZ_TO_US(12));
-  }
+  state_handle[state.step < HALT ? state.step : HALT]();
 }
 
-static void blink_status_leds(const uint32_t interval_us) {
+static void handle_halt_state(void) {
 
   static uint32_t previous_us = 0;
 
   if ((int32_t)(state.time_us - previous_us) >= 0) {
     NRF_P0->OUT ^= (1 << GPIO_STATUS_PIN);
-    previous_us += interval_us;
+    previous_us += state.halt_us == 0 ? HZ_TO_US(12) : state.halt_us;
   }
 }
 
@@ -72,22 +66,21 @@ static inline void handle_reset_state(void) {
 
   const uint32_t elapsed_us = previous_us ? (state.time_us - previous_us) : 0;
 
-  uint32_t interval_us;
   if ((previous_us == 0) || (elapsed_us < S_TO_US(4)))
-    interval_us = HZ_TO_US(12);
+    state.halt_us = HZ_TO_US(12);
   else if (elapsed_us < S_TO_US(5))
-    interval_us = HZ_TO_US(120);
+    state.halt_us = HZ_TO_US(120);
   else {
-    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                      (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
-
+    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
     delay(1000);
     __DMB();
     __NVIC_SystemReset();
+    while (true)
+      ;
   }
 
-  blink_status_leds(interval_us);
+  handle_halt_state();
 }
 
 static inline void prepare_active_state(void) {
@@ -101,49 +94,58 @@ static inline void prepare_active_state(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
-    sensor.VL53L4CD_SensorInit();
-    sensor.VL53L4CD_StartRanging();
+    // sensor.VL53L4CD_SensorInit();
+    // sensor.VL53L4CD_StartRanging();
 
     // servo.EnableTorque(SERVO_DEFAULT_ID, true);
+    Serial.println("[ACTIVE] => Entered active state");
   }
 }
 
 static inline void handle_idle_state(void) {
 
-  if (state.open) {
+  // if (state.open) {
 
-    static VL53L4CD_RawResult_t result = { 0 };
-    static uint8_t object_samples = 0;
-    uint8_t data_ready;
+  //   static VL53L4CD_RawResult_t result = { 0 };
+  //   static uint8_t object_samples = 0;
+  //   uint8_t data_ready;
 
-    if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
+  //   if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
 
-      sensor.VL53L4CD_GetRawResult(&result);
-      sensor.VL53L4CD_ClearInterruptAndStopRanging();
-      sensor.VL53L4CD_StartRanging();
+  //     sensor.VL53L4CD_GetRawResult(&result);
+  //     sensor.VL53L4CD_ClearInterruptAndStopRanging();
+  //     sensor.VL53L4CD_StartRanging();
 
-      if (result.range_status == 9 && __builtin_bswap16(result.distance) < AUTO_DISTANCE_MM) {
-        if (++object_samples >= AUTO_TRIGGER_SAMPLES)
-          object_samples = 0, state.mode = AUTO, Serial.println("Auto: Object detected!");
-      } else
-        object_samples = 0;
-    }
-  }
+  //     if (result.range_status == 9 && __builtin_bswap16(result.distance) < AUTO_DISTANCE_MM) {
+  //       if (++object_samples >= AUTO_TRIGGER_SAMPLES)
+  //         object_samples = 0, state.mode = AUTO, Serial.println("Auto: Object detected!");
+  //     } else
+  //       object_samples = 0;
+  //   }
+  // }
 
   if (state.idle_us == 0) state.idle_us = state.time_us;
 
-  if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)POWER_TIMEOUT_M &&  //
-      NRF_P0->DIR & (1 << GPIO_STATUS_PIN)) {
+  if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)IDLE_TIMEOUT_M &&  //
+      (NRF_P0->DIR & (1 << GPIO_STATUS_PIN))) {
 
-    Serial.println("Power disabled!");
     NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                       (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    Serial.println("[IDLE] => Sensor and servo shutdown");
+  }
+
+  if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)SLEEP_TIMEOUT_M &&  //
+      (NRF_P0->PIN_CNF[GPIO_STATUS_PIN] & GPIO_PIN_CNF_INPUT_Msk) == GPIO_PIN_CNF_INPUT_Msk) {
+    // TODO: Implement full system shutdown (~3µA)
+    Serial.println("[IDLE] => System shutdown");
+    state.step = HALT;
   }
 }
 
-static inline void handle_press_up(void) {
+static inline void handle_up_state(void) {
 
   NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
 
@@ -158,7 +160,7 @@ static inline void handle_press_up(void) {
   //   state.latch = true, servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
 }
 
-static inline void handle_press_down(void) {
+static inline void handle_down_state(void) {
 
   NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
 
