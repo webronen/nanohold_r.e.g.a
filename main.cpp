@@ -103,9 +103,11 @@ static inline void handle_idle_state(void) {
       (NRF_P0->PIN_CNF[GPIO_STATUS_PIN] & GPIO_PIN_CNF_INPUT_Msk) == GPIO_PIN_CNF_INPUT_Msk) {
     // TODO: Implement full system shutdown (~3µA)
     Serial.println("[IDLE] => System shutdown");
+    Serial.flush();
     __DMB();
     __DSB();
     __ISB();
+    // NRF_POWER->SYSTEMOFF = POWER_SYSTEMOFF_SYSTEMOFF_Enter;
     while (true)
       ;
   }
