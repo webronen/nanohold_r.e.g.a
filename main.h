@@ -20,12 +20,16 @@
 #define I2C_CLK_PIN 36
 #define I2C_SDA_PIN 38
 
-#define AUTO_DISTANCE_MM 30
-#define AUTO_TRIGGER_SAMPLES 5
+#define SENSOR_DISTANCE_MM 30
+#define SENSOR_DEBOUNCE_SAMPLES 5
+#define SENSOR_DEBOUNCE_MASK ((1 << SENSOR_DEBOUNCE_SAMPLES) - 1)
 
-#define GPIO_STATUS_PIN 11   // P0.11
-#define GPIO_RIGHT_BUTTON 0  // P1.00
-#define GPIO_LEFT_BUTTON 24  // P0.24
+#define BUTTON_DEBOUNCE_SAMPLES 5
+#define BUTTON_DEBOUNCE_MASK ((1 << BUTTON_DEBOUNCE_SAMPLES) - 1)
+
+#define GPIO_STATUS_PIN 11    // P0.11
+#define GPIO_RIGHT_BUTTON 24  // P0.24
+#define GPIO_LEFT_BUTTON 0    // P1.00
 
 #define SERVO_DEFAULT_ID 1
 
@@ -49,8 +53,8 @@ typedef enum {
 
 typedef enum {
   IDLE = 0,
-  UP = 1,
-  DOWN = 2,
+  DOWN = 1,
+  UP = 2,
   RESET = 3,
   HALT = 4,
 } PressStep_t;
@@ -78,8 +82,8 @@ static inline void handle_halt_state(void);
 
 static const StateHandle state_handle[PRESS_STATE_COUNT] = {
   [IDLE] = handle_idle_state,
-  [UP] = handle_up_state,
   [DOWN] = handle_down_state,
+  [UP] = handle_up_state,
   [RESET] = handle_reset_state,
   [HALT] = handle_halt_state
 };
