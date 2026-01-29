@@ -139,13 +139,9 @@ static inline void handle_idle_state(void) {
                                         (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos) |  //
                                         (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
 
+    NRF_TIMER0->TASKS_STOP = TIMER_TASKS_STOP_TASKS_STOP_Trigger;
     NRF_CLOCK->TASKS_HFCLKSTOP = CLOCK_TASKS_HFCLKSTOP_TASKS_HFCLKSTOP_Trigger;
-    while (NRF_CLOCK->EVENTS_HFCLKSTARTED)
-      ;
-
     NRF_CLOCK->TASKS_LFCLKSTOP = CLOCK_TASKS_LFCLKSTOP_TASKS_LFCLKSTOP_Trigger;
-    while (NRF_CLOCK->EVENTS_LFCLKSTARTED)
-      ;
 
     __DMB();
     __DSB();
