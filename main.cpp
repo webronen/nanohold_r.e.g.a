@@ -47,7 +47,7 @@ void loop() {
   else if (state.buttons == DOWN && state.open) state.mode = MANUAL, state.step = DOWN;
   else if (state.mode == AUTO && state.step == IDLE) state.step = UP;
 
-  if (state.step != IDLE) prepare_active_state();
+  if (state.step != IDLE) active_prepare_state();
 
   state_handle[state.step < HALT ? state.step : HALT]();
 }
@@ -57,7 +57,7 @@ static inline void disconnect_gpio_ports(void) {
   for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 }
 
-static inline void prepare_active_state(void) {
+static inline void active_prepare_state(void) {
 
   state.idle_us = 0;
 
@@ -85,83 +85,88 @@ static inline void prepare_active_state(void) {
   }
 }
 
-static inline void handle_idle_state(void) {
+static inline void idle_prepare_state(void) {
 
-  if (state.open && state.active) {
+  state.idle_us = state.time_us;
+  printf("[IDLE] -> Changed active mode to idle.\r\n");
+  delay(1);
+}
 
-    static VL53L4CD_RawResult_t result = { 0 };
-    static uint8_t sensor_debounce = 0;
+static inline void idle_detect_object(void) {
 
-    uint8_t data_ready;
-    if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
+  static VL53L4CD_RawResult_t result = { 0 };
+  static uint8_t sensor_debounce = 0;
 
-      sensor.VL53L4CD_GetRawResult(&result);
-      sensor.VL53L4CD_ClearInterruptAndStopRanging();
-      sensor.VL53L4CD_StartRanging();
+  uint8_t data_ready;
+  if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
 
-      const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
-      sensor_debounce = (sensor_debounce << 1) | (object_detected ? 1 : 0);
+    sensor.VL53L4CD_GetRawResult(&result);
+    sensor.VL53L4CD_ClearInterruptAndStopRanging();
+    sensor.VL53L4CD_StartRanging();
 
-      if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
-        sensor_debounce = 0;
-        state.mode = AUTO;
-        printf("[AUTO] -> Object detected. Changed active mode to auto.\r\n");
-        delay(1);
-      }
+    const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
+    sensor_debounce = (sensor_debounce << 1) | (object_detected ? 1 : 0);
+
+    if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
+      sensor_debounce = 0;
+      state.mode = AUTO;
+      printf("[AUTO] -> Object detected. Changed active mode to auto.\r\n");
+      delay(1);
     }
   }
+}
 
-  if (state.idle_us == 0 && state.active) {
+static inline void idle_power_save(void) {
 
-    state.idle_us = state.time_us;
-    printf("[IDLE] -> Changed active mode to idle.\r\n");
-    delay(1);
-  }
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
+                                    (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
 
-  if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)POWER_SAVE_TIMEOUT_M && state.active) {
+  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                      (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+  state.active = false;
 
-    NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+  printf("[INFO] -> The system saves power.\r\n");
+  delay(1);
+}
 
-    state.active = false;
+static inline void idle_system_shutdown(void) {
 
-    printf("[INFO] -> The system saves power.\r\n");
-    delay(1);
-  }
+  printf("[INFO] -> The system is being shut down.\r\n");
+  delay(1000);
 
-  if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)SHUTDOWN_TIMEOUT_M && !state.active) {
+  Serial.end();
+  Wire.end();
 
-    printf("[INFO] -> The system is being shut down.\r\n");
-    delay(1000);
+  disconnect_gpio_ports();
 
-    Serial.end();
-    Wire.end();
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
+                                    (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
 
-    disconnect_gpio_ports();
+  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |     //
+                                      (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos) |  //
+                                      (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
 
-    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                      (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+  NRF_TIMER0->TASKS_STOP = TIMER_TASKS_STOP_TASKS_STOP_Trigger;
+  NRF_CLOCK->TASKS_HFCLKSTOP = CLOCK_TASKS_HFCLKSTOP_TASKS_HFCLKSTOP_Trigger;
+  NRF_CLOCK->TASKS_LFCLKSTOP = CLOCK_TASKS_LFCLKSTOP_TASKS_LFCLKSTOP_Trigger;
 
-    NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |     //
-                                        (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos) |  //
-                                        (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+  __disable_irq();
 
-    NRF_TIMER0->TASKS_STOP = TIMER_TASKS_STOP_TASKS_STOP_Trigger;
-    NRF_CLOCK->TASKS_HFCLKSTOP = CLOCK_TASKS_HFCLKSTOP_TASKS_HFCLKSTOP_Trigger;
-    NRF_CLOCK->TASKS_LFCLKSTOP = CLOCK_TASKS_LFCLKSTOP_TASKS_LFCLKSTOP_Trigger;
+  __DMB();
+  __DSB();
+  __ISB();
 
-    __disable_irq();
+  NRF_POWER->SYSTEMOFF = POWER_SYSTEMOFF_SYSTEMOFF_Enter;
+  while (true)
+    ;
+}
 
-    __DMB();
-    __DSB();
-    __ISB();
+static inline void handle_idle_state(void) {
 
-    NRF_POWER->SYSTEMOFF = POWER_SYSTEMOFF_SYSTEMOFF_Enter;
-    while (true)
-      ;
-  }
+  if (state.active && state.idle_us == 0) idle_prepare_state();
+  if (state.active && state.open) idle_detect_object();
+  if (state.active && ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M)) idle_power_save();
+  if (!state.active && ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M)) idle_system_shutdown();
 }
 
 static inline void handle_down_state(void) {
