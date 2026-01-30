@@ -101,8 +101,7 @@ static inline void idle_detect_object(void) {
   if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
 
     sensor.VL53L4CD_GetRawResult(&result);
-    sensor.VL53L4CD_ClearInterruptAndStopRanging();
-    sensor.VL53L4CD_StartRanging();
+    sensor.VL53L4CD_ClearInterrupt();
 
     const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
     sensor_debounce = (sensor_debounce << 1) | (object_detected ? 1 : 0);
