@@ -28,8 +28,6 @@ void setup() {
   Wire.setClock(I2C_FREQUENCY_400K);
 
   Serial.begin(SERIAL_BAUDRATE_1M);
-
-  prepare_active_state();
 }
 
 void loop() {
