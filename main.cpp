@@ -20,7 +20,7 @@ void setup() {
     ;
 
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = 4;
+  NRF_TIMER0->PRESCALER = 4; // 1 MHz
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
 
   Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
@@ -32,7 +32,7 @@ void setup() {
 
 void loop() {
 
-  NRF_TIMER0->TASKS_CAPTURE[0] = 1;
+  NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
   state.time_us = NRF_TIMER0->CC[0];
 
   state.buttons = (PressStep_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON))) << 1) |  //
