@@ -92,6 +92,7 @@ static inline void prepare_active_state(void) {
 static inline void handle_idle_state(void) {
 
   if (state.open && state.active) {
+
     static VL53L4CD_RawResult_t result = { 0 };
     static uint8_t sensor_debounce = 0;
 
@@ -115,6 +116,7 @@ static inline void handle_idle_state(void) {
   }
 
   if (state.idle_us == 0 && state.active) {
+
     state.idle_us = state.time_us;
     printf("[IDLE] -> Changed mode to idle.\r\n");
     delay(1);
@@ -217,13 +219,12 @@ static inline void handle_reset_state(void) {
   else if (elapsed_us < S_TO_US(5)) state.halt_us = HZ_TO_US(120);
   else {
 
-    printf("[RESET] -> The system is being reset.\r\n");
-
     NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                       (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
+    printf("[RESET] -> The system is being reset.\r\n");
     delay(1000);
 
     __disable_irq();
