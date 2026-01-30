@@ -192,8 +192,8 @@ static inline void handle_up_state(void) {
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
 
     printf("[%s UP] -> The press is moving up.\r\n", (state.mode == AUTO) ? "AUTO" :  //
-                                                       state.mode == BOOT ? "BOOT"
-                                                                          : "MANUAL");
+                                                       (state.mode == BOOT) ? "BOOT"
+                                                                            : "MANUAL");
     state.latch = true;
     delay(1000);
   }
