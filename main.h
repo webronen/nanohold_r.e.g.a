@@ -47,8 +47,9 @@ SCSCL servo;
 typedef void (*StateHandle)(void);
 
 typedef enum {
-  MANUAL = 0,
-  AUTO = 1,
+  BOOT = 0,
+  MANUAL = 1,
+  AUTO = 2,
 } PressMode_t;
 
 typedef enum {
@@ -70,7 +71,7 @@ typedef struct {
   bool latch;
 } PressState_t;
 
-static PressState_t state = { .mode = MANUAL, .step = UP };
+static PressState_t state = { .mode = BOOT, .step = UP };
 
 static inline void disconnect_gpio_ports(void);
 static inline void prepare_active_state(void);
