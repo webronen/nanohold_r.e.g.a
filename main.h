@@ -75,7 +75,13 @@ typedef struct {
 static PressState_t state = { .mode = BOOT, .step = UP };
 
 static inline void disconnect_gpio_ports(void);
-static inline void prepare_active_state(void);
+
+static inline void active_prepare_state(void);
+
+static inline void idle_prepare_state(void);
+static inline void idle_detect_object(void);
+static inline void idle_power_save(void);
+static inline void idle_system_shutdown(void);
 
 static inline void handle_idle_state(void);
 static inline void handle_up_state(void);
