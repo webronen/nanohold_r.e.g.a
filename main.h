@@ -70,7 +70,7 @@ typedef struct {
   bool latch;
 } PressState_t;
 
-static PressState_t state = { .mode = AUTO };
+static PressState_t state = { .mode = MANUAL, .step = UP };
 
 static inline void disconnect_gpio_ports(void);
 static inline void prepare_active_state(void);
