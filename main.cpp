@@ -20,7 +20,7 @@ void setup() {
     ;
 
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = 4; // 1 MHz
+  NRF_TIMER0->PRESCALER = 4;  // 1 MHz
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
 
   Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
@@ -163,10 +163,11 @@ static inline void idle_system_shutdown(void) {
 
 static inline void handle_idle_state(void) {
 
-  if (state.active && state.idle_us == 0) idle_prepare_state();
-  if (state.active && state.open) idle_detect_object();
-  if (state.active && ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M)) idle_power_save();
-  if (!state.active && ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M)) idle_system_shutdown();
+  if (state.active) {
+    if (state.idle_us == 0) idle_prepare_state();
+    if (state.open) idle_detect_object();
+    if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
+  } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_system_shutdown();
 }
 
 static inline void handle_down_state(void) {
