@@ -163,7 +163,7 @@ static inline void idle_system_shutdown(void) {
 static inline void handle_idle_state(void) {
 
   if (state.active) {
-    if (state.idle_us == 0) idle_prepare_state();
+    if (!state.idle_us) idle_prepare_state();
     if (state.open) idle_detect_object();
     if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
   } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_system_shutdown();
