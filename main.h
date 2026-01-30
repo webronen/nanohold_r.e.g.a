@@ -11,8 +11,8 @@
 #define M_TO_US(m) ((m)*60 * 1000000UL)
 #define S_TO_US(s) ((s)*1000000UL)
 
-#define IDLE_TIMEOUT_M M_TO_US(1)
-#define SLEEP_TIMEOUT_M M_TO_US(5)
+#define POWER_SAVE_TIMEOUT_M M_TO_US(1)
+#define SHUTDOWN_TIMEOUT_M M_TO_US(5)
 
 #define LDO_ENABLE_PIN 13
 #define SERIAL_BAUDRATE_1M 1000000
@@ -69,6 +69,7 @@ typedef struct {
   PressStep_t buttons;
   bool open;
   bool latch;
+  bool active;
 } PressState_t;
 
 static PressState_t state = { .mode = BOOT, .step = UP };
