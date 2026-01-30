@@ -161,7 +161,7 @@ static inline void handle_down_state(void) {
 
   if (!state.latch /*&& servo.ReadLoad(SERVO_DEFAULT_ID) < PRESS_LOAD_LIMIT*/) {
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
-    printf("[%s] -> The press is moving down.\n", state.mode == AUTO ? "AUTO" : "MANUAL");
+    printf("[%s] -> The press is moving down.\n", (state.mode == AUTO) ? "AUTO" : "MANUAL");
     state.latch = true;
     delay(1000);
   }
@@ -179,7 +179,7 @@ static inline void handle_up_state(void) {
 
   if (!state.latch /*&& servo.ReadPos(SERVO_DEFAULT_ID) < PRESS_UP_POSITION*/) {
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
-    printf("[%s] -> The press is moving up.\n", state.mode == AUTO ? "AUTO" : "MANUAL");
+    printf("[%s] -> The press is moving up.\n", (state.mode == AUTO) ? "AUTO" : "MANUAL");
     state.latch = true;
     delay(1000);
   }
