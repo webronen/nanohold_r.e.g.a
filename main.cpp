@@ -2,8 +2,6 @@
 
 void setup() {
 
-  disconnect_gpio_ports();
-
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                     (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
 
@@ -30,6 +28,8 @@ void setup() {
   Serial.begin(SERIAL_BAUDRATE_1M);
   while (!Serial)
     ;
+
+  prepare_active_state();
 }
 
 void loop() {
@@ -44,18 +44,19 @@ void loop() {
   button_debounce = (button_debounce << 1) | (state.buttons ? 1 : 0);
   if ((button_debounce & BUTTON_DEBOUNCE_Msk) != BUTTON_DEBOUNCE_Msk) state.buttons = IDLE;
 
-  if (state.buttons != IDLE) state.mode = MANUAL, state.step = state.buttons;
+  if (state.buttons == RESET) state.step = RESET;
+  else if (state.buttons == UP && !state.open) state.mode = MANUAL, state.step = UP;
+  else if (state.buttons == DOWN && state.open) state.mode = MANUAL, state.step = DOWN;
   else if (state.mode == AUTO && state.step == IDLE) state.step = UP;
+
   if (state.step != IDLE) prepare_active_state();
 
   state_handle[state.step < HALT ? state.step : HALT]();
 }
 
 static inline void disconnect_gpio_ports(void) {
-
   for (uint8_t i = 0; i < 32; i++)
     NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
   for (uint8_t i = 0; i < 16; i++)
     NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 }
@@ -76,40 +77,43 @@ static inline void prepare_active_state(void) {
       delayMicroseconds(8333);
     }
 
-    // sensor.VL53L4CD_SensorInit();
-    // sensor.VL53L4CD_StartRanging();
+    sensor.VL53L4CD_SensorInit();
+    sensor.VL53L4CD_StartRanging();
 
     // servo.EnableTorque(SERVO_DEFAULT_ID, true);
-    Serial.println("[ACTIVE] -> Switched to active mode.");
+    Serial.println("[ACTIVE] -> Changed mode to active.");
+    delay(1);
   }
 }
 
 static inline void handle_idle_state(void) {
 
-  // if (state.open) {
-  //   static VL53L4CD_RawResult_t result = { 0 };
-  //   static uint8_t sensor_debounce = 0;
+  if (state.open) {
+    static VL53L4CD_RawResult_t result = { 0 };
+    static uint8_t sensor_debounce = 0;
 
-  //   uint8_t data_ready;
-  //   if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
-  //     sensor.VL53L4CD_GetRawResult(&result);
-  //     sensor.VL53L4CD_ClearInterruptAndStopRanging();
-  //     sensor.VL53L4CD_StartRanging();
+    uint8_t data_ready;
+    if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
+      sensor.VL53L4CD_GetRawResult(&result);
+      sensor.VL53L4CD_ClearInterruptAndStopRanging();
+      sensor.VL53L4CD_StartRanging();
 
-  //     const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
-  //     sensor_debounce = (sensor_debounce << 1) | (object_detected ? 1 : 0);
+      const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
+      sensor_debounce = (sensor_debounce << 1) | (object_detected ? 1 : 0);
 
-  //     if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
-  //       sensor_debounce = 0;
-  //       state.mode = AUTO;
-  //       Serial.println("[IDLE] -> Object detected. Changed mode to AUTO.");
-  //     }
-  //   }
-  // }
+      if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
+        sensor_debounce = 0;
+        state.mode = AUTO;
+        Serial.println("[AUTO] -> Changed mode to auto.");
+        delay(1);
+      }
+    }
+  }
 
   if (state.idle_us == 0) {
     state.idle_us = state.time_us;
-    Serial.println("[IDLE] -> Switched to idle mode.");
+    Serial.println("[IDLE] -> Changed mode to idle.");
+    delay(1);
   }
 
   if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)IDLE_TIMEOUT_M &&  //
@@ -120,20 +124,19 @@ static inline void handle_idle_state(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-    Serial.println("[IDLE] -> Turning off connected devices.");
+    Serial.println("[INFO] -> Turning off connected devices.");
+    delay(1);
   }
 
   if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)SLEEP_TIMEOUT_M &&  //
       (NRF_P0->PIN_CNF[GPIO_STATUS_PIN] & GPIO_PIN_CNF_INPUT_Msk) == GPIO_PIN_CNF_INPUT_Msk) {
 
-    Serial.println("[IDLE] -> Shutting down the system.");
+    Serial.println("[INFO] -> Shutting down the system.");
+    Serial.flush();
     delay(1000);
 
-    Serial.flush();
     Serial.end();
     Wire.end();
-
-    disconnect_gpio_ports();
 
     NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |     //
                                         (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos) |  //
@@ -154,44 +157,38 @@ static inline void handle_idle_state(void) {
 }
 
 static inline void handle_down_state(void) {
-
   NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
 
-  if (!state.open) {
-    state.mode = MANUAL;
-    state.step = IDLE;
-    state.latch = false;
-  } else if (!state.latch) {
+  if (!state.latch /*&& servo.ReadLoad(SERVO_DEFAULT_ID) < PRESS_LOAD_LIMIT*/) {
+    // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
+    printf("[%s] -> The press is moving down.\n", state.mode == AUTO ? "AUTO" : "MANUAL");
     state.latch = true;
-    state.open = false;
-    printf("[%s DOWN] -> Moving press down.\n", (state.mode == AUTO) ? "AUTO" : "MANUAL");
-    delay(1);
+    delay(1000);
   }
 
-  // if (!(state.open = !(servo.ReadLoad(SERVO_DEFAULT_ID) >= PRESS_LOAD_LIMIT)))
-  //   state.mode = MANUAL, state.step = IDLE, state.latch = false;
-  // else if (!state.latch)
-  //   state.latch = true, servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
+  // state.open = !(servo.ReadLoad(SERVO_DEFAULT_ID) >= PRESS_LOAD_LIMIT);
+  state.open = false;
+  state.latch = false;
+
+  state.mode = MANUAL;
+  state.step = IDLE;
 }
 
 static inline void handle_up_state(void) {
-
   NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
 
-  if (state.open) {
-    state.step = (state.mode == AUTO) ? DOWN : IDLE;
-    state.latch = false;
-  } else if (!state.latch) {
+  if (!state.latch /*&& servo.ReadPos(SERVO_DEFAULT_ID) < PRESS_UP_POSITION*/) {
+    // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
+    printf("[%s] -> The press is moving up.\n", state.mode == AUTO ? "AUTO" : "MANUAL");
     state.latch = true;
-    state.open = true;
-    printf("[%s UP] -> Moving press up.\n", (state.mode == AUTO) ? "AUTO" : "MANUAL");
-    delay(1);
+    delay(1000);
   }
 
-  // if ((state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION)))
-  //   state.step = (state.mode == AUTO) ? DOWN : IDLE, state.latch = false;
-  // else if (!state.latch)
-  //   state.latch = true, servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
+  // state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
+  state.open = true;
+  state.latch = false;
+
+  state.step = (state.mode == AUTO) ? DOWN : IDLE;
 }
 
 static inline void handle_reset_state(void) {
@@ -215,13 +212,14 @@ static inline void handle_reset_state(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-    Serial.println("[RESET] -> Resetting the system.");
+    Serial.println("[RESET] -> The system is being reset.");
     Serial.flush();
     delay(1000);
 
     __DMB();
     __DSB();
     __ISB();
+
     __NVIC_SystemReset();
     while (true)
       ;
