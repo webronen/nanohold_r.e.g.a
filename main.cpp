@@ -80,7 +80,7 @@ static inline void prepare_active_state(void) {
 
     state.active = true;
 
-    printf("[ACTIVE] -> Changed mode to active.\r\n");
+    printf("[ACTIVE] -> Active mode prepared.\r\n");
     delay(1);
   }
 }
@@ -105,7 +105,7 @@ static inline void handle_idle_state(void) {
       if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
         sensor_debounce = 0;
         state.mode = AUTO;
-        printf("[AUTO] -> Changed mode to auto.\r\n");
+        printf("[AUTO] -> Object detected. Changed active mode to auto.\r\n");
         delay(1);
       }
     }
@@ -114,7 +114,7 @@ static inline void handle_idle_state(void) {
   if (state.idle_us == 0 && state.active) {
 
     state.idle_us = state.time_us;
-    printf("[IDLE] -> Changed mode to idle.\r\n");
+    printf("[IDLE] -> Changed active mode to idle.\r\n");
     delay(1);
   }
 
@@ -127,13 +127,13 @@ static inline void handle_idle_state(void) {
 
     state.active = false;
 
-    printf("[INFO] -> Turning off connected devices.\r\n");
+    printf("[INFO] -> The system saves power.\r\n");
     delay(1);
   }
 
   if ((int32_t)(state.time_us - state.idle_us) >= (int32_t)SHUTDOWN_TIMEOUT_M && !state.active) {
 
-    printf("[INFO] -> Shutting down the system.\r\n");
+    printf("[INFO] -> The system is being shut down.\r\n");
     delay(1000);
 
     Serial.end();
