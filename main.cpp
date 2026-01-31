@@ -42,10 +42,7 @@ void loop() {
 
 static inline void mode_boot(void) {
   step_select[UP]();
-  if (state.open) {
-    state.mode = MANUAL;
-    state.step = IDLE;
-  }
+  if (state.open) state.mode = MANUAL;
 }
 
 static inline void mode_manual(void) {
@@ -69,7 +66,6 @@ static inline void mode_auto(void) {
     step_select[DOWN]();
     if (!state.open) {
       state.mode = MANUAL;
-      state.step = IDLE;
     }
   }
 }
