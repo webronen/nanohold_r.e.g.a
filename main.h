@@ -44,12 +44,13 @@
 VL53L4CD sensor(&Wire, -1);
 SCSCL servo;
 
-typedef void (*StateHandle)(void);
+typedef void (*ModeSelect)(void);
+typedef void (*StateSelect)(void);
 
 typedef enum {
   BOOT = 0,
-  MANUAL = 1,
-  AUTO = 2,
+  AUTO = 1,
+  MANUAL = 2,
 } PressMode_t;
 
 typedef enum {
@@ -57,44 +58,60 @@ typedef enum {
   DOWN = 1,
   UP = 2,
   RESET = 3,
-  HALT = 4,
 } PressStep_t;
+
+static inline void mode_boot(void);
+static inline void mode_manual(void);
+static inline void mode_auto(void);
+
+static inline void state_idle(void);
+static inline void state_down(void);
+static inline void state_up(void);
+static inline void state_reset(void);
+
+static const ModeSelect mode_select[] = {
+  [BOOT] = mode_boot,
+  [AUTO] = mode_auto,
+  [MANUAL] = mode_manual
+};
+
+static const StateSelect step_select[] = {
+  [IDLE] = state_idle,
+  [DOWN] = state_down,
+  [UP] = state_up,
+  [RESET] = state_reset
+};
 
 typedef struct {
   uint32_t time_us;
   uint32_t idle_us;
-  uint32_t halt_us;
+  uint32_t blink_us;
   PressMode_t mode;
   PressStep_t step;
   PressStep_t buttons;
   bool open;
-  bool latch;
   bool active;
+  bool ranging;
 } PressState_t;
 
-static PressState_t state = { .mode = BOOT, .step = UP };
-
-static inline void disconnect_gpio_ports(void);
-
-static inline void active_prepare_state(void);
-
-static inline void idle_prepare_state(void);
-static inline void idle_detect_object(void);
-static inline void idle_power_save(void);
-static inline void idle_system_shutdown(void);
-
-static inline void handle_idle_state(void);
-static inline void handle_up_state(void);
-static inline void handle_down_state(void);
-static inline void handle_reset_state(void);
-static inline void handle_halt_state(void);
-
-static const StateHandle state_handle[PRESS_STATE_COUNT] = {
-  [IDLE] = handle_idle_state,
-  [DOWN] = handle_down_state,
-  [UP] = handle_up_state,
-  [RESET] = handle_reset_state,
-  [HALT] = handle_halt_state
+static PressState_t state = {
+  .time_us = 0,
+  .idle_us = 0,
+  .blink_us = 0,
+  .mode = BOOT,
+  .step = UP,
+  .buttons = IDLE,
+  .open = false,
+  .active = false,
+  .ranging = false
 };
+
+static inline void idle_detect(void);
+static inline void idle_power_save(void);
+static inline void idle_shutdown(void);
+
+static inline void boot_disconnect_gpio(void);
+static inline void active_enable_power(void);
+static inline void active_blink_status(void);
 
 #endif  // MAIN_H
