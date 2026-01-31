@@ -144,7 +144,7 @@ static inline void state_reset(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-    printf("[RESET] -> The system has been reset.\r\n");
+    printf("[RESET] -> The system is being reset.\r\n");
     delay(1000);
 
     __disable_irq();
