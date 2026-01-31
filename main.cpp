@@ -77,10 +77,7 @@ static inline void mode_auto(void) {
 static inline void state_idle(void) {
 
   if (state.active) {
-    if (!state.idle_us) {
-      state.idle_us = state.time_us;
-      printf("[MODE] -> Changed to idle mode.\r\n");
-    }
+    if (!state.idle_us) (state.idle_us = state.time_us);
     if (state.open) idle_detect();
     if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
   } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
@@ -192,7 +189,7 @@ static inline void idle_detect(void) {
       state.mode = AUTO;
       sensor_debounce = 0;
 
-      printf("[AUTO] -> Object detected. Changed to auto mode.\r\n");
+      printf("[MODE] -> Object detected. Changed to auto mode.\r\n");
       delay(1);
     }
   }
@@ -207,7 +204,7 @@ static inline void idle_power_save(void) {
 
   state.active = false;
 
-  printf("[IDLE] -> The system saves power.\r\n");
+  printf("[MODE] -> Changed to idle mode.\r\n");
   delay(1);
 }
 
