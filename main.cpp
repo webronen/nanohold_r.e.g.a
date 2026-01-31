@@ -2,7 +2,7 @@
 
 void setup() {
 
-  disconnect_gpio_ports();
+  boot_disconnect_gpio();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                     (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
@@ -35,81 +35,164 @@ void loop() {
   NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
   state.time_us = NRF_TIMER0->CC[0];
 
+  if (state.step != IDLE) active_enable_power();
+
+  mode_select[state.mode]();
+}
+
+static inline void mode_boot(void) {
+  step_select[UP]();
+  if (state.open) {
+    state.mode = MANUAL;
+    state.step = IDLE;
+  }
+}
+
+static inline void mode_manual(void) {
+
   state.buttons = (PressStep_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON))) << 1) |  //
                                 ((!(NRF_P0->IN & (1 << GPIO_RIGHT_BUTTON))) << 0));
 
   static uint8_t button_debounce = 0;
-  button_debounce = (button_debounce << 1) | (state.buttons ? 1 : 0);
-  if ((button_debounce & BUTTON_DEBOUNCE_Msk) != BUTTON_DEBOUNCE_Msk) state.buttons = IDLE;
+  button_debounce = ((button_debounce << 1) | (!!state.buttons));
 
-  if (state.buttons == RESET) state.step = RESET;
-  else if (state.buttons == UP && !state.open) state.mode = MANUAL, state.step = UP;
-  else if (state.buttons == DOWN && state.open) state.mode = MANUAL, state.step = DOWN;
-  else if (state.mode == AUTO && state.step == IDLE) state.step = UP;
+  if ((button_debounce & BUTTON_DEBOUNCE_Msk) == BUTTON_DEBOUNCE_Msk) state.step = state.buttons;
 
-  if (state.step != IDLE) active_prepare_state();
-
-  state_handle[state.step < HALT ? state.step : HALT]();
+  step_select[state.step]();
 }
 
-static inline void disconnect_gpio_ports(void) {
-  for (uint8_t i = 0; i < 32; i++) NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-  for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-}
+static inline void mode_auto(void) {
 
-static inline void active_prepare_state(void) {
-
-  state.idle_us = 0;
-
-  if (!state.active) {
-
-    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                      (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
-
-    NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
-
-    for (uint8_t i = 0; i < 120; i++) {
-      NRF_P0->OUT ^= (1 << GPIO_STATUS_PIN);
-      delayMicroseconds(8333);
+  if (!state.open) {
+    step_select[UP]();
+  } else {
+    step_select[DOWN]();
+    if (!state.open) {
+      state.mode = MANUAL;
+      state.step = IDLE;
     }
-
-    sensor.VL53L4CD_SensorInit();
-    sensor.VL53L4CD_StartRanging();
-
-    // servo.EnableTorque(SERVO_DEFAULT_ID, true);
-
-    state.active = true;
-
-    printf("[ACTIVE] -> Active mode prepared.\r\n");
-    delay(1);
   }
 }
 
-static inline void idle_prepare_state(void) {
+static inline void state_idle(void) {
 
-  state.idle_us = state.time_us;
-  printf("[IDLE] -> Changed active mode to idle.\r\n");
-  delay(1);
+  if (state.active) {
+    if (!state.idle_us) {
+      state.idle_us = state.time_us;
+      printf("[MODE] -> Changed to idle mode.\r\n");
+    }
+    if (state.open) idle_detect();
+    if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
+  } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
 }
 
-static inline void idle_detect_object(void) {
+static inline void state_down(void) {
+
+  static bool latch = false;
+
+  NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
+
+  // state.open = (servo.ReadLoad(SERVO_DEFAULT_ID) <= PRESS_LOAD_LIMIT);
+
+  if (!latch && state.open) {
+    latch = true;
+    // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
+    printf("[%s] -> The press moves down.\r\n", (state.mode == MANUAL) ? "MANUAL"
+                                                                       : "AUTO");
+    delay(1);
+
+    state.open = false;
+    delay(1000);
+  } else {
+    latch = false;
+    state.step = IDLE;
+  }
+}
+
+static inline void state_up(void) {
+
+  static bool latch = false;
+
+  NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
+
+  // state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
+
+  if (!latch && !state.open) {
+    latch = true;
+
+    // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
+    printf("[%s] -> The press moves up.\r\n", (state.mode == MANUAL) ? "MANUAL"
+                                                                     : "AUTO");
+    delay(1);
+
+    state.open = true;
+    delay(1000);
+  } else {
+    latch = false;
+    state.step = IDLE;
+  }
+}
+
+static inline void state_reset(void) {
+
+  static uint32_t previous_us = 0;
+
+  if (state.buttons != RESET) previous_us = 0;
+  else if (previous_us == 0) previous_us = state.time_us;
+
+  const uint32_t elapsed_us = previous_us ? (state.time_us - previous_us) : 0;
+
+  if ((previous_us == 0) || (elapsed_us < S_TO_US(4))) state.blink_us = HZ_TO_US(12);
+  else if (elapsed_us < S_TO_US(5)) state.blink_us = HZ_TO_US(120);
+  else {
+
+    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
+                                      (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+
+    NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+    printf("[RESET] -> The system has been reset.\r\n");
+    delay(1000);
+
+    __disable_irq();
+
+    __DMB();
+    __DSB();
+    __ISB();
+
+    __NVIC_SystemReset();
+    while (true)
+      ;
+  }
+
+  active_blink_status();
+}
+
+static inline void idle_detect(void) {
+
+  if (!state.ranging) {
+    sensor.VL53L4CD_StartRanging();
+    state.ranging = true;
+  }
 
   static VL53L4CD_RawResult_t result = { 0 };
   static uint8_t sensor_debounce = 0;
 
   uint8_t data_ready;
   if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
-
     sensor.VL53L4CD_GetRawResult(&result);
     sensor.VL53L4CD_ClearInterrupt();
 
     const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
-    sensor_debounce = (sensor_debounce << 1) | (object_detected ? 1 : 0);
+    sensor_debounce = ((sensor_debounce << 1) | (!!object_detected));
 
     if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
-      sensor_debounce = 0;
+      sensor.VL53L4CD_ClearInterruptAndStopRanging();
+      state.ranging = false;
       state.mode = AUTO;
-      printf("[AUTO] -> Object detected. Changed active mode to auto.\r\n");
+      sensor_debounce = 0;
+
+      printf("[AUTO] -> Object detected. Changed to auto mode.\r\n");
       delay(1);
     }
   }
@@ -124,19 +207,19 @@ static inline void idle_power_save(void) {
 
   state.active = false;
 
-  printf("[INFO] -> The system saves power.\r\n");
+  printf("[IDLE] -> The system saves power.\r\n");
   delay(1);
 }
 
-static inline void idle_system_shutdown(void) {
+static inline void idle_shutdown(void) {
 
-  printf("[INFO] -> The system is being shut down.\r\n");
+  printf("[IDLE] -> The system is shut down.\r\n");
   delay(1000);
 
   Serial.end();
   Wire.end();
 
-  disconnect_gpio_ports();
+  boot_disconnect_gpio();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                     (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
@@ -160,97 +243,43 @@ static inline void idle_system_shutdown(void) {
     ;
 }
 
-static inline void handle_idle_state(void) {
-
-  if (state.active) {
-    if (!state.idle_us) idle_prepare_state();
-    if (state.open) idle_detect_object();
-    if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
-  } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_system_shutdown();
+static inline void boot_disconnect_gpio(void) {
+  for (uint8_t i = 0; i < 32; i++) NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+  for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 }
 
-static inline void handle_down_state(void) {
+static inline void active_enable_power(void) {
 
-  NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
+  state.idle_us = 0;
 
-  if (!state.latch /*&& servo.ReadLoad(SERVO_DEFAULT_ID) < PRESS_LOAD_LIMIT*/) {
-    // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
-    printf("[%s DOWN] -> The press is moving down.\r\n", (state.mode == AUTO) ? "AUTO" : "MANUAL");
-    state.latch = true;
-    delay(1000);
-  }
+  if (state.active) return;
 
-  // state.open = !(servo.ReadLoad(SERVO_DEFAULT_ID) >= PRESS_LOAD_LIMIT);
-  state.open = false;
-  state.latch = false;
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
+                                    (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
 
-  state.mode = MANUAL;
-  state.step = IDLE;
-}
+  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
-static inline void handle_up_state(void) {
-
-  NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
-
-  if (!state.latch /*&& servo.ReadPos(SERVO_DEFAULT_ID) < PRESS_UP_POSITION*/) {
-    // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
-
-    printf("[%s UP] -> The press is moving up.\r\n", (state.mode == BOOT) ? "BOOT" :  //
-                                                       (state.mode == AUTO) ? "AUTO"
-                                                                            : "MANUAL");
-    state.latch = true;
-    delay(1000);
-  }
-
-  // state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
-  state.open = true;
-  state.latch = false;
-
-  if (state.mode == BOOT) state.mode = MANUAL, state.step = IDLE;
-  else state.step = (state.mode == AUTO) ? DOWN : IDLE;
-}
-
-static inline void handle_reset_state(void) {
-
-  static uint32_t previous_us = 0;
-
-  if (state.buttons != RESET) previous_us = 0;
-  else if (previous_us == 0) previous_us = state.time_us;
-
-  const uint32_t elapsed_us = previous_us ? (state.time_us - previous_us) : 0;
-
-  if ((previous_us == 0) || (elapsed_us < S_TO_US(4))) state.halt_us = HZ_TO_US(12);
-  else if (elapsed_us < S_TO_US(5)) state.halt_us = HZ_TO_US(120);
-  else {
-
-    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                      (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
-
-    NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
-    printf("[RESET] -> The system is being reset.\r\n");
-    delay(1000);
-
-    __disable_irq();
-
-    __DMB();
-    __DSB();
-    __ISB();
-
-    __NVIC_SystemReset();
-    while (true)
-      ;
-  }
-
-  handle_halt_state();
-}
-
-static inline void handle_halt_state(void) {
-
-  static uint32_t previous_us = 0;
-
-  if ((int32_t)(state.time_us - previous_us) >= 0) {
+  for (uint8_t i = 0; i < 120; i++) {
     NRF_P0->OUT ^= (1 << GPIO_STATUS_PIN);
-    previous_us += state.halt_us == 0 ? HZ_TO_US(12) : state.halt_us;
+    delayMicroseconds(8333);
+  }
+
+  sensor.VL53L4CD_SensorInit();
+  sensor.VL53L4CD_StartRanging();
+
+  // servo.EnableTorque(SERVO_DEFAULT_ID, true);
+
+  state.ranging = true;
+  state.active = true;
+
+  printf("[MODE] -> Changed to active mode.\r\n");
+  delay(1);
+}
+
+static inline void active_blink_status(void) {
+  static uint32_t time_us = 0;
+  if ((int32_t)(state.time_us - time_us) >= 0) {
+    NRF_P0->OUT ^= (1 << GPIO_STATUS_PIN);
+    time_us += state.blink_us ? state.blink_us : HZ_TO_US(12);
   }
 }
