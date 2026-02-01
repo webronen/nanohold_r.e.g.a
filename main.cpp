@@ -193,7 +193,7 @@ static inline void idle_power_save(void) {
     .mode = MANUAL,
     .step = IDLE,
     .buttons = IDLE,
-    // .open = false,
+    .open = state.open,
     .active = false,
     .ranging = false
   };
