@@ -28,8 +28,8 @@ static inline void mode_boot(void) {
   state.step = UP;
   step_select[state.step]();
   if (state.open) {
-    state.step = IDLE;
     state.mode = MANUAL;
+    state.step = IDLE;
   }
 }
 
