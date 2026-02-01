@@ -2,18 +2,8 @@
 
 void setup() {
 
-  boot_disconnect_gpio();
-
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                    (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
-
-  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
-  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                      (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
-
-  NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                       (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
+  gpio_disconnect_system();
+  gpio_configure_system();
 
   NRF_CLOCK->TASKS_HFCLKSTART = CLOCK_TASKS_HFCLKSTART_TASKS_HFCLKSTART_Trigger;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
@@ -22,12 +12,6 @@ void setup() {
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   NRF_TIMER0->PRESCALER = 4;  // 1 MHz
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
-
-  Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
-  Wire.begin();
-  Wire.setClock(I2C_FREQUENCY_400K);
-
-  Serial.begin(SERIAL_BAUDRATE_1M);
 }
 
 void loop() {
@@ -42,7 +26,9 @@ void loop() {
 
 static inline void mode_boot(void) {
   step_select[UP]();
-  if (state.open) state.mode = MANUAL;
+  if (state.open) {
+    state.mode = MANUAL;
+  }
 }
 
 static inline void mode_manual(void) {
@@ -186,24 +172,29 @@ static inline void idle_detect(void) {
 
 static inline void idle_power_save(void) {
 
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                    (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+  debug_print_status("[IDLE] -> The system saves power.\r\n", 1);
 
-  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+  Serial.flush();
+  Serial.end();
+  
+  Wire.end();
+
+  gpio_disconnect_system();
+  gpio_configure_system();
 
   state.active = false;
-
-  debug_print_status("[IDLE] -> The system saves power.\r\n", 1);
 }
 
 static inline void idle_shutdown(void) {
 
-  debug_print_status("[IDLE] -> The system is turned off.\r\n", 1000);
+  debug_print_status("[IDLE] -> The system is turned off.\r\n", 1);
 
+  Serial.flush();
   Serial.end();
+
   Wire.end();
 
-  boot_disconnect_gpio();
+  gpio_disconnect_system();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                     (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
@@ -227,9 +218,23 @@ static inline void idle_shutdown(void) {
     ;
 }
 
-static inline void boot_disconnect_gpio(void) {
+static void gpio_disconnect_system(void) {
   for (uint8_t i = 0; i < 32; i++) NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
   for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+}
+
+static void gpio_configure_system(void) {
+
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
+                                    (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+
+  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
+                                      (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
+
+  NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
+                                       (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
 }
 
 static inline void active_enable_power(void) {
@@ -238,6 +243,12 @@ static inline void active_enable_power(void) {
                                     | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
+
+  Wire.setPins(32 + I2C_SDA_PIN, 32 + I2C_CLK_PIN);
+  Wire.begin();
+  Wire.setClock(I2C_FREQUENCY_400K);
+
+  Serial.begin(SERIAL_BAUDRATE_1M);
 
   for (uint8_t i = 0; i < 120; i++) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
