@@ -41,13 +41,15 @@ static inline void mode_manual(void) {
   static uint8_t button_debounce = 0;
   button_debounce = ((button_debounce << 1) | (!!state.buttons));
 
-  if ((button_debounce & BUTTON_DEBOUNCE_Msk) == BUTTON_DEBOUNCE_Msk) state.step = state.buttons;
+  if ((button_debounce & BUTTON_DEBOUNCE_Msk) == BUTTON_DEBOUNCE_Msk) {
+    state.step = state.buttons;
+    state.idle_us = state.time_us;
+  }
 
   step_select[state.step]();
 }
 
 static inline void mode_auto(void) {
-
   if (!state.open) {
     state.step = UP;
     step_select[state.step]();
@@ -186,17 +188,10 @@ static inline void idle_power_save(void) {
 
   Wire.end();
 
-  state = {
-    .time_us = 0,
-    .idle_us = 0,
-    .blink_us = 0,
-    .mode = MANUAL,
-    .step = IDLE,
-    .buttons = IDLE,
-    .open = state.open,
-    .active = false,
-    .ranging = false
-  };
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
+                                    (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+
+  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 }
 
 static inline void idle_shutdown(void) {
