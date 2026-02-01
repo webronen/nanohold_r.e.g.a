@@ -187,7 +187,17 @@ static inline void idle_power_save(void) {
   gpio_disconnect_system();
   gpio_configure_system();
 
-  state.active = false;
+  state = {
+    .time_us = 0,
+    .idle_us = 0,
+    .blink_us = 0,
+    .mode = MANUAL,
+    .step = IDLE,
+    .buttons = IDLE,
+    // .open = false,
+    .active = false,
+    .ranging = false
+  };
 }
 
 static inline void idle_shutdown(void) {
