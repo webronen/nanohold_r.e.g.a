@@ -25,8 +25,10 @@ void loop() {
 }
 
 static inline void mode_boot(void) {
-  step_select[UP]();
+  state.step = UP;
+  step_select[state.step]();
   if (state.open) {
+    state.step = IDLE;
     state.mode = MANUAL;
   }
 }
@@ -47,11 +49,14 @@ static inline void mode_manual(void) {
 static inline void mode_auto(void) {
 
   if (!state.open) {
-    step_select[UP]();
+    state.step = UP;
+    step_select[state.step]();
   } else {
-    step_select[DOWN]();
+    state.step = DOWN;
+    step_select[state.step]();
     if (!state.open) {
       state.mode = MANUAL;
+      state.step = IDLE;
     }
   }
 }
@@ -176,7 +181,7 @@ static inline void idle_power_save(void) {
 
   Serial.flush();
   Serial.end();
-  
+
   Wire.end();
 
   gpio_disconnect_system();
