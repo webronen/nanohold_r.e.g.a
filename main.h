@@ -17,8 +17,8 @@
 #define LDO_ENABLE_PIN 13
 #define SERIAL_BAUDRATE_1M 1000000
 #define I2C_FREQUENCY_400K 400000
-#define I2C_CLK_PIN 36
-#define I2C_SDA_PIN 38
+#define I2C_CLK_PIN 4
+#define I2C_SDA_PIN 6
 
 #define SENSOR_DISTANCE_MM 30
 #define SENSOR_DEBOUNCE_SAMPLES 5
@@ -110,7 +110,9 @@ static inline void idle_detect(void);
 static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
 
-static inline void boot_disconnect_gpio(void);
+static void gpio_disconnect_system(void);
+static void gpio_configure_system(void);
+
 static inline void active_enable_power(void);
 static inline void active_blink_status(void);
 
