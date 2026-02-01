@@ -231,6 +231,11 @@ static inline void active_enable_power(void) {
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
+  for (uint8_t i = 0; i < 120; i++) {
+    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
+    delayMicroseconds(8333);
+  }
+
   sensor.VL53L4CD_SensorInit();
   sensor.VL53L4CD_StartRanging();
 
@@ -239,11 +244,6 @@ static inline void active_enable_power(void) {
   state.ranging = true;
   state.active = true;
   state.idle_us = state.time_us;
-
-  for (uint8_t i = 0; i < 120; i++) {
-    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
-    delayMicroseconds(8333);
-  }
 }
 
 static inline void active_blink_status(void) {
