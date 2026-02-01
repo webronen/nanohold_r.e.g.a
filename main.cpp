@@ -247,10 +247,10 @@ static inline void active_enable_power(void) {
 }
 
 static inline void active_blink_status(void) {
-  static uint32_t time_us = 0;
-  if ((int32_t)(state.time_us - time_us) >= 0) {
+  static uint32_t previous_us = 0;
+  if ((int32_t)(state.time_us - previous_us) >= 0) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
-    if (state.blink_us) time_us += state.blink_us;
-    else time_us += HZ_TO_US(12);
+    if (state.blink_us) previous_us += state.blink_us;
+    else previous_us += HZ_TO_US(12);
   }
 }
