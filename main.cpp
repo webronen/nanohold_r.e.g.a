@@ -35,7 +35,7 @@ void loop() {
   NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
   state.time_us = NRF_TIMER0->CC[0];
 
-  if (state.step != IDLE) active_enable_power();
+  if (state.step != IDLE && !state.active) active_enable_power();
 
   mode_select[state.mode]();
 }
@@ -73,7 +73,6 @@ static inline void mode_auto(void) {
 static inline void state_idle(void) {
 
   if (state.active) {
-    if (!state.idle_us) (state.idle_us = state.time_us);
     if (state.open) idle_detect();
     if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
   } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
@@ -88,12 +87,10 @@ static inline void state_down(void) {
   // state.open = (servo.ReadLoad(SERVO_DEFAULT_ID) <= PRESS_LOAD_LIMIT);
 
   if (!latch && state.open) {
-    latch = true;
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
-    printf("[%s] -> The press moves down.\r\n", (state.mode == MANUAL) ? "MANUAL"
-                                                                       : "AUTO");
-    delay(1);
+    debug_print_status("[STATE] -> The press moves down.\r\n", 1);
 
+    latch = true;
     state.open = false;
     delay(1000);
   } else {
@@ -111,13 +108,11 @@ static inline void state_up(void) {
   // state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
 
   if (!latch && !state.open) {
-    latch = true;
 
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
-    printf("[%s] -> The press moves up.\r\n", (state.mode == MANUAL) ? "MANUAL"
-                                                                     : "AUTO");
-    delay(1);
+    debug_print_status("[STATE] -> The press moves up.\r\n", 1);
 
+    latch = true;
     state.open = true;
     delay(1000);
   } else {
@@ -144,8 +139,7 @@ static inline void state_reset(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-    printf("[RESET] -> The system is being reset.\r\n");
-    delay(1000);
+    debug_print_status("[RESET] -> The system is reset.\r\n", 1000);
 
     __disable_irq();
 
@@ -185,8 +179,7 @@ static inline void idle_detect(void) {
       state.mode = AUTO;
       sensor_debounce = 0;
 
-      printf("[MODE] -> Object detected. Changed to auto mode.\r\n");
-      delay(1);
+      debug_print_status("[MODE] -> Object detected. Changed to auto mode.\r\n", 1);
     }
   }
 }
@@ -200,14 +193,12 @@ static inline void idle_power_save(void) {
 
   state.active = false;
 
-  printf("[MODE] -> Changed to idle mode.\r\n");
-  delay(1);
+  debug_print_status("[IDLE] -> The system saves power.\r\n", 1);
 }
 
 static inline void idle_shutdown(void) {
 
-  printf("[IDLE] -> The system is shut down.\r\n");
-  delay(1000);
+  debug_print_status("[IDLE] -> The system is turned off.\r\n", 1000);
 
   Serial.end();
   Wire.end();
@@ -243,17 +234,13 @@ static inline void boot_disconnect_gpio(void) {
 
 static inline void active_enable_power(void) {
 
-  state.idle_us = 0;
-
-  if (state.active) return;
-
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                    (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                    | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
   for (uint8_t i = 0; i < 120; i++) {
-    NRF_P0->OUT ^= (1 << GPIO_STATUS_PIN);
+    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
     delayMicroseconds(8333);
   }
 
@@ -264,15 +251,21 @@ static inline void active_enable_power(void) {
 
   state.ranging = true;
   state.active = true;
+  state.idle_us = state.time_us;
 
-  printf("[MODE] -> Changed to active mode.\r\n");
-  delay(1);
+  debug_print_status("[MODE] -> Changed to active mode.\r\n", 1);
 }
 
 static inline void active_blink_status(void) {
   static uint32_t time_us = 0;
   if ((int32_t)(state.time_us - time_us) >= 0) {
-    NRF_P0->OUT ^= (1 << GPIO_STATUS_PIN);
-    time_us += state.blink_us ? state.blink_us : HZ_TO_US(12);
+    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
+    if (state.blink_us) time_us += state.blink_us;
+    else time_us += HZ_TO_US(12);
   }
+}
+
+static void debug_print_status(const char* status, const uint32_t delay_ms) {
+  Serial.write(status);
+  delay(delay_ms);
 }
