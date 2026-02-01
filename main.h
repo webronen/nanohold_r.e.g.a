@@ -111,7 +111,6 @@ static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
 
 static void gpio_disconnect_system(void);
-static void gpio_configure_system(void);
 
 static inline void active_enable_power(void);
 static inline void active_blink_status(void);
