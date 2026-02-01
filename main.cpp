@@ -227,7 +227,7 @@ static inline void active_enable_power(void) {
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
-  Wire.setPins(32 + I2C_SDA_PIN, 32 + I2C_CLK_PIN);
+  Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
