@@ -200,6 +200,8 @@ static inline void idle_power_save(void) {
                                     (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+  state.active = false;
 }
 
 static inline void idle_shutdown(void) {
