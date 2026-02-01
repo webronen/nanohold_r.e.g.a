@@ -114,4 +114,6 @@ static inline void boot_disconnect_gpio(void);
 static inline void active_enable_power(void);
 static inline void active_blink_status(void);
 
+static void debug_print_status(const char* status, const uint32_t delay);
+
 #endif  // MAIN_H
