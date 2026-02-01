@@ -121,11 +121,11 @@ static inline void state_up(void) {
 static inline void state_reset(void) {
 
   static uint32_t previous_us = 0;
+  uint32_t elapsed_us = 0;
 
   if (state.buttons != RESET) previous_us = 0;
   else if (previous_us == 0) previous_us = state.time_us;
-
-  const uint32_t elapsed_us = previous_us ? (state.time_us - previous_us) : 0;
+  else elapsed_us = state.time_us - previous_us;
 
   if ((previous_us == 0) || (elapsed_us < S_TO_US(4))) state.blink_us = HZ_TO_US(12);
   else if (elapsed_us < S_TO_US(5)) state.blink_us = HZ_TO_US(120);
