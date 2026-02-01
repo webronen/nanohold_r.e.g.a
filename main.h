@@ -109,7 +109,7 @@ static PressState_t state = {
 static inline void idle_detect(void);
 static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
-static inline inline idle_disconnect_gpio(void);
+static void idle_disconnect_gpio(void);
 
 static inline void active_enable_power(void);
 static void inline active_blink_status(void);
