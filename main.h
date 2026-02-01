@@ -115,6 +115,4 @@ static void gpio_disconnect_system(void);
 static inline void active_enable_power(void);
 static inline void active_blink_status(void);
 
-static void debug_print_status(const char* status, const uint32_t delay);
-
 #endif  // MAIN_H
