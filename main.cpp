@@ -132,6 +132,8 @@ static inline void state_reset(void) {
 
     debug_print_status("[RESET] -> The system is reset.\r\n", 1000);
 
+    Serial.flush();
+
     __disable_irq();
 
     __DMB();
@@ -183,9 +185,6 @@ static inline void idle_power_save(void) {
   Serial.end();
 
   Wire.end();
-
-  gpio_disconnect_system();
-  gpio_configure_system();
 
   state = {
     .time_us = 0,
