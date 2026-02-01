@@ -2,12 +2,7 @@
 
 void setup() {
 
-  gpio_disconnect_system();
-
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
-                                    (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
-
-  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+  idle_power_save();
 
   NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                       (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
@@ -91,7 +86,6 @@ static inline void state_down(void) {
 
   if (!latch && state.open) {
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
-    debug_print_status("[STATE] -> The press moves down.\r\n", 1);
 
     latch = true;
     state.open = false;
@@ -113,7 +107,6 @@ static inline void state_up(void) {
   if (!latch && !state.open) {
 
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
-    debug_print_status("[STATE] -> The press moves up.\r\n", 1);
 
     latch = true;
     state.open = true;
@@ -142,7 +135,7 @@ static inline void state_reset(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-    debug_print_status("[RESET] -> The system is reset.\r\n", 1000);
+    delay(1000);
 
     __disable_irq();
 
@@ -181,20 +174,11 @@ static inline void idle_detect(void) {
       state.ranging = false;
       state.mode = AUTO;
       sensor_debounce = 0;
-
-      debug_print_status("[MODE] -> Object detected. Changed to auto mode.\r\n", 1);
     }
   }
 }
 
 static inline void idle_power_save(void) {
-
-  debug_print_status("[IDLE] -> The system saves power.\r\n", 1);
-
-  Serial.flush();
-  Serial.end();
-
-  Wire.end();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                     (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
@@ -206,14 +190,7 @@ static inline void idle_power_save(void) {
 
 static inline void idle_shutdown(void) {
 
-  debug_print_status("[IDLE] -> The system is turned off.\r\n", 1);
-
-  Serial.flush();
-  Serial.end();
-
-  Wire.end();
-
-  gpio_disconnect_system();
+  idle_disconnect_gpio();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos) |  //
                                     (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
@@ -237,7 +214,7 @@ static inline void idle_shutdown(void) {
     ;
 }
 
-static void gpio_disconnect_system(void) {
+static void inline idle_disconnect_gpio(void) {
   for (uint8_t i = 0; i < 32; i++) NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
   for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 }
@@ -253,13 +230,6 @@ static inline void active_enable_power(void) {
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
-  Serial.begin(SERIAL_BAUDRATE_1M);
-
-  for (uint8_t i = 0; i < 120; i++) {
-    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
-    delayMicroseconds(8333);
-  }
-
   sensor.VL53L4CD_SensorInit();
   sensor.VL53L4CD_StartRanging();
 
@@ -269,7 +239,10 @@ static inline void active_enable_power(void) {
   state.active = true;
   state.idle_us = state.time_us;
 
-  debug_print_status("[MODE] -> Changed to active mode.\r\n", 1);
+  for (uint8_t i = 0; i < 120; i++) {
+    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
+    delayMicroseconds(8333);
+  }
 }
 
 static inline void active_blink_status(void) {
@@ -279,9 +252,4 @@ static inline void active_blink_status(void) {
     if (state.blink_us) time_us += state.blink_us;
     else time_us += HZ_TO_US(12);
   }
-}
-
-static void debug_print_status(const char* status, const uint32_t delay_ms) {
-  Serial.write(status);
-  delay(delay_ms);
 }
