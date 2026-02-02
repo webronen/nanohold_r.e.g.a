@@ -27,13 +27,19 @@ void loop() {
 
   if (state.step != IDLE && !state.active) active_enable_power();
 
-  mode_select[state.mode]();
+  change_mode[state.mode]();
 }
 
 static inline void mode_boot(void) {
-  state.step = UP;
-  step_select[state.step]();
-  if (state.open) {
+
+  if (state.press == FAULT)
+    state.step = HALT;
+  else
+    state.step = UP;
+
+  execute_step[state.step]();
+
+  if (state.press == OPEN) {
     state.mode = MANUAL;
     state.step = IDLE;
   }
@@ -52,27 +58,30 @@ static inline void mode_manual(void) {
     state.idle_us = state.time_us;
   }
 
-  step_select[state.step]();
+  execute_step[state.step]();
 }
 
 static inline void mode_auto(void) {
-  if (!state.open) {
-    state.step = UP;
-    step_select[state.step]();
-  } else {
+
+  if (state.press == FAULT)
+    state.step = HALT;
+  else if (state.press == OPEN)
     state.step = DOWN;
-    step_select[state.step]();
-    if (!state.open) {
-      state.mode = MANUAL;
-      state.step = IDLE;
-    }
+  else
+    state.step = UP;
+
+  execute_step[state.step]();
+
+  if (state.press == CLOSED) {
+    state.mode = MANUAL;
+    state.step = IDLE;
   }
 }
 
 static inline void state_idle(void) {
 
   if (state.active) {
-    if (state.open) idle_detect();
+    if (state.press == OPEN) idle_detect();
     if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
   } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
 }
@@ -85,11 +94,11 @@ static inline void state_down(void) {
 
   // state.open = (servo.ReadLoad(SERVO_DEFAULT_ID) <= PRESS_LOAD_LIMIT);
 
-  if (!latch && state.open) {
+  if (!latch && (state.press == OPEN)) {
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
 
     latch = true;
-    state.open = false;
+    state.press = CLOSED;
     delay(1000);
   } else {
     latch = false;
@@ -105,12 +114,12 @@ static inline void state_up(void) {
 
   // state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
 
-  if (!latch && !state.open) {
+  if (!latch && (state.press == CLOSED)) {
 
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
 
     latch = true;
-    state.open = true;
+    state.press = OPEN;
     delay(1000);
   } else {
     latch = false;
@@ -149,6 +158,10 @@ static inline void state_reset(void) {
       ;
   }
 
+  active_blink_status();
+}
+
+static inline void state_halt(void) {
   active_blink_status();
 }
 
@@ -246,7 +259,7 @@ static inline void active_enable_power(void) {
   state.idle_us = state.time_us;
 }
 
-static inline void active_blink_status(void) {
+static void active_blink_status(void) {
   static uint32_t previous_us = 0;
   if ((int32_t)(state.time_us - previous_us) >= 0) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
