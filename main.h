@@ -48,23 +48,23 @@ typedef void (*ModeSelect)(void);
 typedef void (*StepSelect)(void);
 
 typedef enum {
-  BOOT = 0,
-  AUTO = 1,
-  MANUAL = 2,
-} PressMode_t;
+  MODE_BOOT = 0,
+  MODE_AUTO = 1,
+  MODE_MANUAL = 2,
+} StepMode_t;
 
 typedef enum {
-  IDLE = 0,
-  DOWN = 1,
-  UP = 2,
-  RESET = 3,
-  HALT = 4
-} PressStep_t;
+  STEP_IDLE = 0,
+  STEP_DOWN = 1,
+  STEP_UP = 2,
+  STEP_RESET = 3,
+  STEP_HALT = 4
+} StepState_t;
 
 typedef enum {
-  OPEN = 0,
-  CLOSED = 1,
-  FAULT = 2,
+  PRESS_OPEN = 0,
+  PRESS_CLOSED = 1,
+  PRESS_FAULT = 2,
 } PressState_t;
 
 typedef enum {
@@ -93,26 +93,26 @@ static inline void state_reset(void);
 static inline void state_halt(void);
 
 static const ModeSelect change_mode[] = {
-  [BOOT] = mode_boot,
-  [AUTO] = mode_auto,
-  [MANUAL] = mode_manual
+  [MODE_BOOT] = mode_boot,
+  [MODE_AUTO] = mode_auto,
+  [MODE_MANUAL] = mode_manual
 };
 
 static const StepSelect execute_step[] = {
-  [IDLE] = state_idle,
-  [DOWN] = state_down,
-  [UP] = state_up,
-  [RESET] = state_reset,
-  [HALT] = state_halt
+  [STEP_IDLE] = state_idle,
+  [STEP_DOWN] = state_down,
+  [STEP_UP] = state_up,
+  [STEP_RESET] = state_reset,
+  [STEP_HALT] = state_halt
 };
 
 typedef struct {
   uint32_t time_us;
   uint32_t idle_us;
   uint32_t blink_us;
-  PressMode_t mode;
-  PressStep_t step;
-  PressStep_t buttons;
+  StepMode_t mode;
+  StepState_t step;
+  StepState_t buttons;
   PressState_t press;
   LatchState_t latch;
   PowerState_t active;
@@ -123,10 +123,10 @@ static SystemState_t state = {
   .time_us = 0,
   .idle_us = 0,
   .blink_us = 0,
-  .mode = BOOT,
-  .step = UP,
-  .buttons = IDLE,
-  .press = CLOSED,
+  .mode = MODE_BOOT,
+  .step = STEP_UP,
+  .buttons = STEP_IDLE,
+  .press = PRESS_CLOSED,
   .latch = LATCH_OFF,
   .active = POWER_SAVE,
   .ranging = RANGE_IDLE
