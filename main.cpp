@@ -25,7 +25,7 @@ void loop() {
   NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
   state.time_us = NRF_TIMER0->CC[0];
 
-  if (state.step != IDLE && !state.active) active_enable_power();
+  if ((state.step != IDLE) && (state.active == POWER_SAVE)) active_enable_power();
 
   change_mode[state.mode]();
 }
@@ -80,7 +80,7 @@ static inline void mode_auto(void) {
 
 static inline void state_idle(void) {
 
-  if (state.active) {
+  if (state.active == POWER_ACTIVE) {
     if (state.press == OPEN) idle_detect();
     if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
   } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
@@ -88,41 +88,37 @@ static inline void state_idle(void) {
 
 static inline void state_down(void) {
 
-  static bool latch = false;
-
   NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
 
   // state.open = (servo.ReadLoad(SERVO_DEFAULT_ID) <= PRESS_LOAD_LIMIT);
 
-  if (!latch && (state.press == OPEN)) {
+  if ((state.latch == LATCH_OFF) && (state.press == OPEN)) {
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
 
-    latch = true;
+    state.latch = LATCH_ON;
     state.press = CLOSED;
     delay(1000);
   } else {
-    latch = false;
+    state.latch = LATCH_OFF;
     state.step = IDLE;
   }
 }
 
 static inline void state_up(void) {
 
-  static bool latch = false;
-
   NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
 
   // state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
 
-  if (!latch && (state.press == CLOSED)) {
+  if ((state.latch == LATCH_OFF) && (state.press == CLOSED)) {
 
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
 
-    latch = true;
+    state.latch = LATCH_ON;
     state.press = OPEN;
     delay(1000);
   } else {
-    latch = false;
+    state.latch = LATCH_OFF;
     state.step = IDLE;
   }
 }
@@ -167,9 +163,9 @@ static inline void state_halt(void) {
 
 static inline void idle_detect(void) {
 
-  if (!state.ranging) {
+  if (state.ranging == RANGE_IDLE) {
     sensor.VL53L4CD_StartRanging();
-    state.ranging = true;
+    state.ranging = RANGE_MEASURING;
   }
 
   static VL53L4CD_RawResult_t result = { 0 };
@@ -185,7 +181,7 @@ static inline void idle_detect(void) {
 
     if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
       sensor.VL53L4CD_ClearInterruptAndStopRanging();
-      state.ranging = false;
+      state.ranging = RANGE_IDLE;
       state.mode = AUTO;
       sensor_debounce = 0;
     }
@@ -199,7 +195,7 @@ static inline void idle_power_save(void) {
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-  state.active = false;
+  state.active = POWER_SAVE;
 }
 
 static inline void idle_shutdown(void) {
@@ -254,8 +250,8 @@ static inline void active_enable_power(void) {
 
   // servo.EnableTorque(SERVO_DEFAULT_ID, true);
 
-  state.ranging = true;
-  state.active = true;
+  state.ranging = RANGE_MEASURING;
+  state.active = POWER_ACTIVE;
   state.idle_us = state.time_us;
 }
 
