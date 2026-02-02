@@ -115,8 +115,8 @@ typedef struct {
   StepState_t buttons;
   PressState_t press;
   LatchState_t latch;
-  PowerState_t active;
-  RangeState_t ranging;
+  PowerState_t power;
+  RangeState_t range;
 } SystemState_t;
 
 static SystemState_t state = {
@@ -128,8 +128,8 @@ static SystemState_t state = {
   .buttons = STEP_IDLE,
   .press = PRESS_CLOSED,
   .latch = LATCH_OFF,
-  .active = POWER_SAVE,
-  .ranging = RANGE_IDLE
+  .power = POWER_SAVE,
+  .range = RANGE_IDLE
 };
 
 static inline void idle_detect(void);
