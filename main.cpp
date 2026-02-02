@@ -32,10 +32,8 @@ void loop() {
 
 static inline void mode_boot(void) {
 
-  if (state.press == PRESS_FAULT)
-    state.step = STEP_HALT;
-  else
-    state.step = STEP_UP;
+  if (state.press == PRESS_FAULT) state.step = STEP_HALT;
+  else state.step = STEP_UP;
 
   execute_step[state.step]();
 
@@ -53,7 +51,7 @@ static inline void mode_manual(void) {
   static uint8_t button_debounce = 0;
   button_debounce = ((button_debounce << 1) | (!!state.buttons));
 
-  if ((button_debounce & BUTTON_DEBOUNCE_Msk) == BUTTON_DEBOUNCE_Msk) {
+  if (button_debounce == UINT8_MAX) {
     state.step = state.buttons;
     state.idle_us = state.time_us;
   }
@@ -63,12 +61,9 @@ static inline void mode_manual(void) {
 
 static inline void mode_auto(void) {
 
-  if (state.press == PRESS_FAULT)
-    state.step = STEP_HALT;
-  else if (state.press == PRESS_OPEN)
-    state.step = STEP_DOWN;
-  else
-    state.step = STEP_UP;
+  if (state.press == PRESS_FAULT) state.step = STEP_HALT;
+  else if (state.press == PRESS_OPEN) state.step = STEP_DOWN;
+  else state.step = STEP_UP;
 
   execute_step[state.step]();
 
@@ -184,7 +179,7 @@ static inline void idle_detect(void) {
     const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
     sensor_debounce = ((sensor_debounce << 1) | (!!object_detected));
 
-    if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
+    if (sensor_debounce == UINT8_MAX) {
       sensor.VL53L4CD_ClearInterruptAndStopRanging();
       state.range = RANGE_IDLE;
       state.mode = MODE_AUTO;
