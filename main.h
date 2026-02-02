@@ -73,13 +73,13 @@ typedef enum {
 } LatchState_t;
 
 typedef enum {
-  POWER_SAVE = 0,
+  POWER_IDLE = 0,
   POWER_ACTIVE = 1
 } PowerState_t;
 
 typedef enum {
   RANGE_IDLE = 0,
-  RANGE_MEASURING = 1
+  RANGE_ACTIVE = 1
 } RangeState_t;
 
 static inline void mode_boot(void);
@@ -128,7 +128,7 @@ static SystemState_t state = {
   .buttons = STEP_IDLE,
   .press = PRESS_CLOSED,
   .latch = LATCH_OFF,
-  .power = POWER_SAVE,
+  .power = POWER_IDLE,
   .range = RANGE_IDLE
 };
 
