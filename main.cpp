@@ -25,7 +25,7 @@ void loop() {
   NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
   state.time_us = NRF_TIMER0->CC[0];
 
-  if ((state.step != STEP_IDLE) && (state.power == POWER_SAVE)) active_enable_power();
+  if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) active_enable_power();
 
   change_mode[state.mode]();
 }
@@ -170,7 +170,7 @@ static inline void idle_detect(void) {
 
   if (state.range == RANGE_IDLE) {
     sensor.VL53L4CD_StartRanging();
-    state.range = RANGE_MEASURING;
+    state.range = RANGE_ACTIVE;
   }
 
   static VL53L4CD_RawResult_t result = { 0 };
@@ -200,7 +200,7 @@ static inline void idle_power_save(void) {
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-  state.power = POWER_SAVE;
+  state.power = POWER_IDLE;
 }
 
 static inline void idle_shutdown(void) {
@@ -255,7 +255,7 @@ static inline void active_enable_power(void) {
 
   // servo.EnableTorque(SERVO_DEFAULT_ID, true);
 
-  state.range = RANGE_MEASURING;
+  state.range = RANGE_ACTIVE;
   state.power = POWER_ACTIVE;
   state.idle_us = state.time_us;
 }
