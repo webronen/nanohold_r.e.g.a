@@ -25,29 +25,29 @@ void loop() {
   NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
   state.time_us = NRF_TIMER0->CC[0];
 
-  if ((state.step != IDLE) && (state.active == POWER_SAVE)) active_enable_power();
+  if ((state.step != STEP_IDLE) && (state.active == POWER_SAVE)) active_enable_power();
 
   change_mode[state.mode]();
 }
 
 static inline void mode_boot(void) {
 
-  if (state.press == FAULT)
-    state.step = HALT;
+  if (state.press == PRESS_FAULT)
+    state.step = STEP_HALT;
   else
-    state.step = UP;
+    state.step = STEP_UP;
 
   execute_step[state.step]();
 
-  if (state.press == OPEN) {
-    state.mode = MANUAL;
-    state.step = IDLE;
+  if (state.press == PRESS_OPEN) {
+    state.mode = MODE_MANUAL;
+    state.step = STEP_IDLE;
   }
 }
 
 static inline void mode_manual(void) {
 
-  state.buttons = (PressStep_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON))) << 1) |  //
+  state.buttons = (StepState_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON))) << 1) |  //
                                 ((!(NRF_P0->IN & (1 << GPIO_RIGHT_BUTTON))) << 0));
 
   static uint8_t button_debounce = 0;
@@ -63,25 +63,25 @@ static inline void mode_manual(void) {
 
 static inline void mode_auto(void) {
 
-  if (state.press == FAULT)
-    state.step = HALT;
-  else if (state.press == OPEN)
-    state.step = DOWN;
+  if (state.press == PRESS_FAULT)
+    state.step = STEP_HALT;
+  else if (state.press == PRESS_OPEN)
+    state.step = STEP_DOWN;
   else
-    state.step = UP;
+    state.step = STEP_UP;
 
   execute_step[state.step]();
 
-  if (state.press == CLOSED) {
-    state.mode = MANUAL;
-    state.step = IDLE;
+  if (state.press == PRESS_CLOSED) {
+    state.mode = MODE_MANUAL;
+    state.step = STEP_IDLE;
   }
 }
 
 static inline void state_idle(void) {
 
   if (state.active == POWER_ACTIVE) {
-    if (state.press == OPEN) idle_detect();
+    if (state.press == PRESS_OPEN) idle_detect();
     if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
   } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
 }
@@ -92,15 +92,15 @@ static inline void state_down(void) {
 
   // state.open = (servo.ReadLoad(SERVO_DEFAULT_ID) <= PRESS_LOAD_LIMIT);
 
-  if ((state.latch == LATCH_OFF) && (state.press == OPEN)) {
+  if ((state.latch == LATCH_OFF) && (state.press == PRESS_OPEN)) {
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
 
     state.latch = LATCH_ON;
-    state.press = CLOSED;
+    state.press = PRESS_CLOSED;
     delay(1000);
   } else {
     state.latch = LATCH_OFF;
-    state.step = IDLE;
+    state.step = STEP_IDLE;
   }
 }
 
@@ -110,16 +110,16 @@ static inline void state_up(void) {
 
   // state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
 
-  if ((state.latch == LATCH_OFF) && (state.press == CLOSED)) {
+  if ((state.latch == LATCH_OFF) && (state.press == PRESS_CLOSED)) {
 
     // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
 
     state.latch = LATCH_ON;
-    state.press = OPEN;
+    state.press = PRESS_OPEN;
     delay(1000);
   } else {
     state.latch = LATCH_OFF;
-    state.step = IDLE;
+    state.step = STEP_IDLE;
   }
 }
 
@@ -128,7 +128,7 @@ static inline void state_reset(void) {
   static uint32_t previous_us = 0;
   uint32_t elapsed_us = 0;
 
-  if (state.buttons != RESET) previous_us = 0;
+  if (state.buttons != STEP_RESET) previous_us = 0;
   else if (previous_us == 0) previous_us = state.time_us;
   else elapsed_us = state.time_us - previous_us;
 
@@ -182,7 +182,7 @@ static inline void idle_detect(void) {
     if ((sensor_debounce & SENSOR_DEBOUNCE_Msk) == SENSOR_DEBOUNCE_Msk) {
       sensor.VL53L4CD_ClearInterruptAndStopRanging();
       state.ranging = RANGE_IDLE;
-      state.mode = AUTO;
+      state.mode = MODE_AUTO;
       sensor_debounce = 0;
     }
   }
