@@ -154,11 +154,16 @@ static inline void state_reset(void) {
       ;
   }
 
-  active_blink_status();
+  state_halt();
 }
 
 static inline void state_halt(void) {
-  active_blink_status();
+  static uint32_t previous_us = 0;
+  if ((int32_t)(state.time_us - previous_us) >= 0) {
+    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
+    if (state.blink_us) previous_us += state.blink_us;
+    else previous_us += HZ_TO_US(12);
+  }
 }
 
 static inline void idle_detect(void) {
@@ -253,13 +258,4 @@ static inline void active_enable_power(void) {
   state.ranging = RANGE_MEASURING;
   state.active = POWER_ACTIVE;
   state.idle_us = state.time_us;
-}
-
-static void active_blink_status(void) {
-  static uint32_t previous_us = 0;
-  if ((int32_t)(state.time_us - previous_us) >= 0) {
-    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
-    if (state.blink_us) previous_us += state.blink_us;
-    else previous_us += HZ_TO_US(12);
-  }
 }
