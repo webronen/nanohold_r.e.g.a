@@ -45,13 +45,14 @@ static inline void mode_boot(void) {
 
 static inline void mode_manual(void) {
 
+  static uint8_t button_history = 0;
+
   state.buttons = (StepState_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON))) << 1) |  //
                                 ((!(NRF_P0->IN & (1 << GPIO_RIGHT_BUTTON))) << 0));
 
-  static uint8_t button_debounce = 0;
-  button_debounce = ((button_debounce << 1) | (!!state.buttons));
+  button_history = ((button_history << 1) | (!!state.buttons));
 
-  if (button_debounce == UINT8_MAX) {
+  if (button_history == UINT8_MAX) {
     state.step = state.buttons;
     state.idle_us = state.time_us;
   }
@@ -164,8 +165,8 @@ static inline void state_halt(void) {
 static inline void idle_detect(void) {
 
   static VL53L4CD_RawResult_t result = { 0 };
-  static uint8_t sensor_debounce = 0;
-  
+  static uint8_t detect_history = 0;
+
   if (state.range == RANGE_IDLE) {
     sensor.VL53L4CD_StartRanging();
     state.range = RANGE_ACTIVE;
@@ -177,13 +178,13 @@ static inline void idle_detect(void) {
     sensor.VL53L4CD_ClearInterrupt();
 
     const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
-    sensor_debounce = ((sensor_debounce << 1) | (!!object_detected));
+    detect_history = ((detect_history << 1) | (!!object_detected));
 
-    if (sensor_debounce == UINT8_MAX) {
+    if (detect_history == UINT8_MAX) {
       sensor.VL53L4CD_ClearInterruptAndStopRanging();
       state.range = RANGE_IDLE;
       state.mode = MODE_AUTO;
-      sensor_debounce = 0;
+      detect_history = 0;
     }
   }
 }
