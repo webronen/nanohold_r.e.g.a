@@ -163,13 +163,13 @@ static inline void state_halt(void) {
 
 static inline void idle_detect(void) {
 
+  static VL53L4CD_RawResult_t result = { 0 };
+  static uint8_t sensor_debounce = 0;
+  
   if (state.range == RANGE_IDLE) {
     sensor.VL53L4CD_StartRanging();
     state.range = RANGE_ACTIVE;
   }
-
-  static VL53L4CD_RawResult_t result = { 0 };
-  static uint8_t sensor_debounce = 0;
 
   uint8_t data_ready;
   if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
