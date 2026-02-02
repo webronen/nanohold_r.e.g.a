@@ -67,6 +67,21 @@ typedef enum {
   FAULT = 2,
 } PressState_t;
 
+typedef enum {
+  LATCH_OFF = 0,
+  LATCH_ON = 1
+} LatchState_t;
+
+typedef enum {
+  POWER_SAVE = 0,
+  POWER_ACTIVE = 1
+} PowerState_t;
+
+typedef enum {
+  RANGE_IDLE = 0,
+  RANGE_MEASURING = 1
+} RangeState_t;
+
 static inline void mode_boot(void);
 static inline void mode_auto(void);
 static inline void mode_manual(void);
@@ -99,8 +114,9 @@ typedef struct {
   PressStep_t step;
   PressStep_t buttons;
   PressState_t press;
-  bool active;
-  bool ranging;
+  LatchState_t latch;
+  PowerState_t active;
+  RangeState_t ranging;
 } SystemState_t;
 
 static SystemState_t state = {
@@ -111,8 +127,9 @@ static SystemState_t state = {
   .step = UP,
   .buttons = IDLE,
   .press = CLOSED,
-  .active = false,
-  .ranging = false,
+  .latch = LATCH_OFF,
+  .active = POWER_SAVE,
+  .ranging = RANGE_IDLE
 };
 
 static inline void idle_detect(void);
