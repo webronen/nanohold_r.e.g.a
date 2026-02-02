@@ -45,7 +45,7 @@ VL53L4CD sensor(&Wire, -1);
 SCSCL servo;
 
 typedef void (*ModeSelect)(void);
-typedef void (*StateSelect)(void);
+typedef void (*StepSelect)(void);
 
 typedef enum {
   BOOT = 0,
@@ -58,28 +58,37 @@ typedef enum {
   DOWN = 1,
   UP = 2,
   RESET = 3,
+  HALT = 4
 } PressStep_t;
 
+typedef enum {
+  OPEN = 0,
+  CLOSED = 1,
+  FAULT = 2,
+} PressState_t;
+
 static inline void mode_boot(void);
-static inline void mode_manual(void);
 static inline void mode_auto(void);
+static inline void mode_manual(void);
 
 static inline void state_idle(void);
 static inline void state_down(void);
 static inline void state_up(void);
 static inline void state_reset(void);
+static inline void state_halt(void);
 
-static const ModeSelect mode_select[] = {
+static const ModeSelect change_mode[] = {
   [BOOT] = mode_boot,
   [AUTO] = mode_auto,
   [MANUAL] = mode_manual
 };
 
-static const StateSelect step_select[] = {
+static const StepSelect execute_step[] = {
   [IDLE] = state_idle,
   [DOWN] = state_down,
   [UP] = state_up,
-  [RESET] = state_reset
+  [RESET] = state_reset,
+  [HALT] = state_halt
 };
 
 typedef struct {
@@ -89,21 +98,21 @@ typedef struct {
   PressMode_t mode;
   PressStep_t step;
   PressStep_t buttons;
-  bool open;
+  PressState_t press;
   bool active;
   bool ranging;
-} PressState_t;
+} SystemState_t;
 
-static PressState_t state = {
+static SystemState_t state = {
   .time_us = 0,
   .idle_us = 0,
   .blink_us = 0,
   .mode = BOOT,
   .step = UP,
   .buttons = IDLE,
-  .open = false,
+  .press = CLOSED,
   .active = false,
-  .ranging = false
+  .ranging = false,
 };
 
 static inline void idle_detect(void);
