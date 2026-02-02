@@ -138,6 +138,5 @@ static inline void idle_shutdown(void);
 static void idle_disconnect_gpio(void);
 
 static inline void active_enable_power(void);
-static inline void active_blink_status(void);
 
 #endif  // MAIN_H
