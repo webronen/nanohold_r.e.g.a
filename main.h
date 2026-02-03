@@ -136,6 +136,6 @@ static inline void idle_power_wakeup(void);
 static inline void idle_detect(void);
 static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
-static void idle_shutdown_gpio(void);
+static void idle_disconnect_gpio(void);
 
 #endif  // MAIN_H
