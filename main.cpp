@@ -2,7 +2,7 @@
 
 void setup() {
 
-  idle_disconnect_gpio();
+  idle_shutdown_gpio();
   idle_power_save();
 
   NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
@@ -25,7 +25,7 @@ void loop() {
   NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
   state.time_us = NRF_TIMER0->CC[0];
 
-  if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) active_enable_power();
+  if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) idle_power_wakeup();
 
   change_mode[state.mode]();
 }
@@ -38,6 +38,20 @@ static inline void mode_boot(void) {
   execute_step[state.step]();
 
   if (state.press == PRESS_OPEN) {
+    state.mode = MODE_MANUAL;
+    state.step = STEP_IDLE;
+  }
+}
+
+static inline void mode_auto(void) {
+
+  if (state.press == PRESS_FAULT) state.step = STEP_HALT;
+  else if (state.press == PRESS_OPEN) state.step = STEP_DOWN;
+  else state.step = STEP_UP;
+
+  execute_step[state.step]();
+
+  if (state.press == PRESS_CLOSED) {
     state.mode = MODE_MANUAL;
     state.step = STEP_IDLE;
   }
@@ -60,40 +74,22 @@ static inline void mode_manual(void) {
   execute_step[state.step]();
 }
 
-static inline void mode_auto(void) {
-
-  if (state.press == PRESS_FAULT) state.step = STEP_HALT;
-  else if (state.press == PRESS_OPEN) state.step = STEP_DOWN;
-  else state.step = STEP_UP;
-
-  execute_step[state.step]();
-
-  if (state.press == PRESS_CLOSED) {
-    state.mode = MODE_MANUAL;
-    state.step = STEP_IDLE;
-  }
-}
-
 static inline void state_idle(void) {
-
-  if (state.power == POWER_ACTIVE) {
-    if (state.press == PRESS_OPEN) idle_detect();
-    if ((int32_t)(state.time_us - state.idle_us) >= POWER_SAVE_TIMEOUT_M) idle_power_save();
-  } else if ((int32_t)(state.time_us - state.idle_us) >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
+  const int32_t idle_us = (state.time_us - state.idle_us);
+  if (idle_us >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
+  else if (idle_us >= POWER_SAVE_TIMEOUT_M) idle_power_save();
+  else if (state.power == POWER_ACTIVE && state.press == PRESS_OPEN) idle_detect();
 }
 
 static inline void state_down(void) {
 
   NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
 
-  // state.open = (servo.ReadLoad(SERVO_DEFAULT_ID) <= PRESS_LOAD_LIMIT);
+  state.press = (PressState_t)(servo.ReadLoad(SERVO_DEFAULT_ID) < PRESS_LOAD_LIMIT);
 
   if ((state.latch == LATCH_OFF) && (state.press == PRESS_OPEN)) {
-    // servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
-
+    servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
     state.latch = LATCH_ON;
-    state.press = PRESS_CLOSED;
-    delay(1000);
   } else {
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
@@ -104,15 +100,11 @@ static inline void state_up(void) {
 
   NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
 
-  // state.open = (servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
+  state.press = (PressState_t)(servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
 
   if ((state.latch == LATCH_OFF) && (state.press == PRESS_CLOSED)) {
-
-    // servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
-
+    servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
     state.latch = LATCH_ON;
-    state.press = PRESS_OPEN;
-    delay(1000);
   } else {
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
@@ -137,7 +129,7 @@ static inline void state_reset(void) {
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-    delay(1000);
+    delay(S_TO_MS(1));
 
     __disable_irq();
 
@@ -160,6 +152,36 @@ static inline void state_halt(void) {
     if (state.blink_us) previous_us += state.blink_us;
     else previous_us += HZ_TO_US(12);
   }
+}
+
+static inline void idle_power_wakeup(void) {
+
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                    | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
+
+  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
+
+  Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
+  Wire.begin();
+  Wire.setClock(I2C_FREQUENCY_400K);
+
+  Serial1.setPins(UART_RX_PIN, UART_TX_PIN);
+  Serial1.begin(UART_BAUDRATE_1M);
+  servo.pSerial = &Serial1;
+
+  for (uint8_t i = 0; i < 120; i++) {
+    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
+    delay(HZ_TO_MS(12));
+  }
+
+  sensor.VL53L4CD_SensorInit();
+  sensor.VL53L4CD_StartRanging();
+
+  servo.EnableTorque(SERVO_DEFAULT_ID, true);
+
+  state.range = RANGE_ACTIVE;
+  state.power = POWER_ACTIVE;
+  state.idle_us = state.time_us;
 }
 
 static inline void idle_detect(void) {
@@ -190,6 +212,9 @@ static inline void idle_detect(void) {
 }
 
 static inline void idle_power_save(void) {
+  
+  Wire.end();
+  Serial1.end();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                                     | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
@@ -201,7 +226,10 @@ static inline void idle_power_save(void) {
 
 static inline void idle_shutdown(void) {
 
-  idle_disconnect_gpio();
+  Wire.end();
+  Serial1.end();
+
+  idle_shutdown_gpio();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                                     | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
@@ -225,33 +253,7 @@ static inline void idle_shutdown(void) {
     ;
 }
 
-static void idle_disconnect_gpio(void) {
+static void idle_shutdown_gpio(void) {
   for (uint8_t i = 0; i < 32; i++) NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
   for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-}
-
-static inline void active_enable_power(void) {
-
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                    | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
-
-  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
-
-  Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
-  Wire.begin();
-  Wire.setClock(I2C_FREQUENCY_400K);
-
-  for (uint8_t i = 0; i < 120; i++) {
-    NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
-    delayMicroseconds(8333);
-  }
-
-  sensor.VL53L4CD_SensorInit();
-  sensor.VL53L4CD_StartRanging();
-
-  // servo.EnableTorque(SERVO_DEFAULT_ID, true);
-
-  state.range = RANGE_ACTIVE;
-  state.power = POWER_ACTIVE;
-  state.idle_us = state.time_us;
 }
