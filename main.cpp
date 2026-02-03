@@ -16,7 +16,7 @@ void setup() {
     ;
 
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = 4;  // 1 MHz
+  NRF_TIMER0->PRESCALER = 4;  // 1 MHz (1us Tick)
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
 }
 
@@ -116,12 +116,12 @@ static inline void state_reset(void) {
   static uint32_t history_us = 0;
   uint32_t pressed_us = 0;
 
-  if (state.buttons != STEP_RESET) history_us = 0;
-  else if (history_us == 0) history_us = state.time_us;
-  else pressed_us = state.time_us - history_us;
+  if (state.buttons != STEP_RESET) (history_us = 0, state.blink_us = 0);
+  else if (history_us == 0) (history_us = state.time_us);
+  else pressed_us = (state.time_us - history_us);
 
-  if ((history_us == 0) || (pressed_us < S_TO_US(4))) state.blink_us = HZ_TO_US(12);
-  else if (pressed_us < S_TO_US(5)) state.blink_us = HZ_TO_US(120);
+  if ((history_us == 0) || (pressed_us < S_TO_US(4))) (state.blink_us = HZ_TO_US(12));
+  else if (pressed_us < S_TO_US(5)) (state.blink_us = HZ_TO_US(120));
   else {
 
     NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
@@ -149,8 +149,8 @@ static inline void state_halt(void) {
   static uint32_t history_us = 0;
   if ((int32_t)(state.time_us - history_us) >= 0) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
-    if (state.blink_us) history_us += state.blink_us;
-    else history_us += HZ_TO_US(12);
+    if (state.blink_us) (history_us += state.blink_us);
+    else (history_us += HZ_TO_US(12));
   }
 }
 
