@@ -184,7 +184,7 @@ static inline void idle_power_wakeup(void) {
 
 static inline void idle_detect(void) {
 
-  static VL53L4CD_RawResult_t result = { 0 };
+  static VL53L4CD_RawResult_t raw_result = { 0 };
   static uint8_t detect_history = 0;
 
   if (state.range == RANGE_IDLE) {
@@ -192,12 +192,12 @@ static inline void idle_detect(void) {
     state.range = RANGE_ACTIVE;
   }
 
-  uint8_t data_ready;
-  if (!sensor.VL53L4CD_CheckForDataReady(&data_ready) && data_ready) {
-    sensor.VL53L4CD_GetRawResult(&result);
+  bool is_data_ready;
+  if (!sensor.VL53L4CD_CheckForDataReady(&is_data_ready) && is_data_ready) {
+    sensor.VL53L4CD_GetRawResult(&raw_result);
     sensor.VL53L4CD_ClearInterrupt();
 
-    const bool object_detected = (result.range_status == 9 && __builtin_bswap16(result.distance) < SENSOR_DISTANCE_MM);
+    const bool object_detected = (raw_result.range_status == 9 && __builtin_bswap16(raw_result.distance) < SENSOR_DISTANCE_MM);
     detect_history = ((detect_history << 1) | (!!object_detected));
 
     if (detect_history == UINT8_MAX) {
