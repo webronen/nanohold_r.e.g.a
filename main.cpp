@@ -2,7 +2,7 @@
 
 void setup() {
 
-  idle_shutdown_gpio();
+  idle_disconnect_gpio();
   idle_power_save();
 
   NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
@@ -229,7 +229,7 @@ static inline void idle_shutdown(void) {
   Wire.end();
   Serial1.end();
 
-  idle_shutdown_gpio();
+  idle_disconnect_gpio();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                                     | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
@@ -253,7 +253,7 @@ static inline void idle_shutdown(void) {
     ;
 }
 
-static void idle_shutdown_gpio(void) {
+static void idle_disconnect_gpio(void) {
   for (uint8_t i = 0; i < 32; i++) NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
   for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 }
