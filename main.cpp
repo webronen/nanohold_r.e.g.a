@@ -83,12 +83,11 @@ static inline void state_idle(void) {
 
 static inline void state_down(void) {
 
-  NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
-
   state.press = (PressState_t)(servo.ReadLoad(SERVO_DEFAULT_ID) < PRESS_LOAD_LIMIT);
 
   if ((state.latch == LATCH_OFF) && (state.press == PRESS_OPEN)) {
     servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
+    NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
     state.latch = LATCH_ON;
   } else {
     state.latch = LATCH_OFF;
@@ -98,12 +97,11 @@ static inline void state_down(void) {
 
 static inline void state_up(void) {
 
-  NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
-
   state.press = (PressState_t)(servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
 
   if ((state.latch == LATCH_OFF) && (state.press == PRESS_CLOSED)) {
     servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
+    NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
     state.latch = LATCH_ON;
   } else {
     state.latch = LATCH_OFF;
