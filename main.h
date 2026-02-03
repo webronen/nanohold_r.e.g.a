@@ -8,17 +8,22 @@
 #include <SCServo.h>
 
 #define HZ_TO_US(hz) (1000000UL / (hz))
+#define HZ_TO_MS(hz) (1000UL / (hz))
 #define M_TO_US(m) ((m)*60 * 1000000UL)
 #define S_TO_US(s) ((s)*1000000UL)
+#define S_TO_MS(s) ((s)*1000UL)
 
 #define POWER_SAVE_TIMEOUT_M M_TO_US(1)
 #define SHUTDOWN_TIMEOUT_M M_TO_US(5)
 
 #define LDO_ENABLE_PIN 13
-#define SERIAL_BAUDRATE_1M 1000000
+#define SERIAL_BAUDRATE_1M 115200
 #define I2C_FREQUENCY_400K 400000
 #define I2C_CLK_PIN 36  // P1.04
 #define I2C_SDA_PIN 38  // P1.06
+#define UART_BAUDRATE_1M 1000000
+#define UART_RX_PIN 29  // P0.29
+#define UART_TX_PIN 47  // P1.15
 
 #define SENSOR_DISTANCE_MM 30
 
@@ -39,16 +44,16 @@
 VL53L4CD sensor(&Wire, -1);
 SCSCL servo;
 
-typedef void (*ModeSelect)(void);
-typedef void (*StepSelect)(void);
+typedef void (*ModeSelect_t)(void);
+typedef void (*StepSelect_t)(void);
 
-typedef enum {
+typedef enum StepMode {
   MODE_BOOT = 0,
   MODE_AUTO = 1,
   MODE_MANUAL = 2,
 } StepMode_t;
 
-typedef enum {
+typedef enum StepState {
   STEP_IDLE = 0,
   STEP_DOWN = 1,
   STEP_UP = 2,
@@ -56,23 +61,23 @@ typedef enum {
   STEP_HALT = 4
 } StepState_t;
 
-typedef enum {
-  PRESS_OPEN = 0,
-  PRESS_CLOSED = 1,
+typedef enum PressState {
+  PRESS_CLOSED = 0,
+  PRESS_OPEN = 1,
   PRESS_FAULT = 2,
 } PressState_t;
 
-typedef enum {
+typedef enum LatchState {
   LATCH_OFF = 0,
   LATCH_ON = 1
 } LatchState_t;
 
-typedef enum {
+typedef enum PowerState {
   POWER_IDLE = 0,
   POWER_ACTIVE = 1
 } PowerState_t;
 
-typedef enum {
+typedef enum RangeState {
   RANGE_IDLE = 0,
   RANGE_ACTIVE = 1
 } RangeState_t;
@@ -87,13 +92,13 @@ static inline void state_up(void);
 static inline void state_reset(void);
 static inline void state_halt(void);
 
-static const ModeSelect change_mode[] = {
+static const ModeSelect_t change_mode[] = {
   [MODE_BOOT] = mode_boot,
   [MODE_AUTO] = mode_auto,
   [MODE_MANUAL] = mode_manual
 };
 
-static const StepSelect execute_step[] = {
+static const StepSelect_t execute_step[] = {
   [STEP_IDLE] = state_idle,
   [STEP_DOWN] = state_down,
   [STEP_UP] = state_up,
@@ -127,11 +132,10 @@ static SystemState_t state = {
   .range = RANGE_IDLE
 };
 
+static inline void idle_power_wakeup(void);
 static inline void idle_detect(void);
 static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
-static void idle_disconnect_gpio(void);
-
-static inline void active_enable_power(void);
+static void idle_shutdown_gpio(void);
 
 #endif  // MAIN_H
