@@ -113,15 +113,15 @@ static inline void state_up(void) {
 
 static inline void state_reset(void) {
 
-  static uint32_t previous_us = 0;
-  uint32_t elapsed_us = 0;
+  static uint32_t history_us = 0;
+  uint32_t pressed_us = 0;
 
-  if (state.buttons != STEP_RESET) previous_us = 0;
-  else if (previous_us == 0) previous_us = state.time_us;
-  else elapsed_us = state.time_us - previous_us;
+  if (state.buttons != STEP_RESET) history_us = 0;
+  else if (history_us == 0) history_us = state.time_us;
+  else pressed_us = state.time_us - history_us;
 
-  if ((previous_us == 0) || (elapsed_us < S_TO_US(4))) state.blink_us = HZ_TO_US(12);
-  else if (elapsed_us < S_TO_US(5)) state.blink_us = HZ_TO_US(120);
+  if ((history_us == 0) || (pressed_us < S_TO_US(4))) state.blink_us = HZ_TO_US(12);
+  else if (pressed_us < S_TO_US(5)) state.blink_us = HZ_TO_US(120);
   else {
 
     NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
@@ -146,11 +146,11 @@ static inline void state_reset(void) {
 }
 
 static inline void state_halt(void) {
-  static uint32_t previous_us = 0;
-  if ((int32_t)(state.time_us - previous_us) >= 0) {
+  static uint32_t history_us = 0;
+  if ((int32_t)(state.time_us - history_us) >= 0) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
-    if (state.blink_us) previous_us += state.blink_us;
-    else previous_us += HZ_TO_US(12);
+    if (state.blink_us) history_us += state.blink_us;
+    else history_us += HZ_TO_US(12);
   }
 }
 
