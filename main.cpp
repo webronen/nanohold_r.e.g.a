@@ -192,7 +192,7 @@ static inline void idle_detect(void) {
     state.range = RANGE_ACTIVE;
   }
 
-  bool is_data_ready;
+  uint8_t is_data_ready;
   if (!sensor.VL53L4CD_CheckForDataReady(&is_data_ready) && is_data_ready) {
     sensor.VL53L4CD_GetRawResult(&raw_result);
     sensor.VL53L4CD_ClearInterrupt();
