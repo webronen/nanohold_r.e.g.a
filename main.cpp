@@ -187,6 +187,11 @@ static inline void idle_detect(void) {
   static VL53L4CD_RawResult_t raw_result = { 0 };
   static uint8_t detect_history = 0;
 
+  if (state.range == RANGE_IDLE) {
+    sensor.VL53L4CD_StartRanging();
+    state.range = RANGE_ACTIVE;
+  }
+
   uint8_t is_data_ready;
   if (!sensor.VL53L4CD_CheckForDataReady(&is_data_ready) && is_data_ready) {
     sensor.VL53L4CD_GetRawResult(&raw_result);
@@ -202,15 +207,10 @@ static inline void idle_detect(void) {
       detect_history = 0;
     }
   }
-
-  if (state.range == RANGE_IDLE) {
-    sensor.VL53L4CD_StartRanging();
-    state.range = RANGE_ACTIVE;
-  }
 }
 
 static inline void idle_power_save(void) {
-
+  
   Wire.end();
   Serial1.end();
 
