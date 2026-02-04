@@ -27,14 +27,14 @@ void loop() {
 
   if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) idle_power_wakeup();
 
-  if (state.mode > MODE_HALT || state.press >= PRESS_FAULT) (state.mode = MODE_HALT);
+  if ((state.mode > MODE_HALT) || (state.press > PRESS_FAULT)) (state.mode = MODE_HALT);
 
   change_mode[state.mode]();
 }
 
 static inline void mode_boot(void) {
 
-  if (state.step > STEP_HALT || state.press >= PRESS_FAULT) (state.step = STEP_HALT);
+  if ((state.step > STEP_HALT) || (state.press > PRESS_FAULT)) (state.step = STEP_HALT);
   else (state.step = STEP_UP);
 
   execute_step[state.step]();
@@ -47,7 +47,7 @@ static inline void mode_boot(void) {
 
 static inline void mode_auto(void) {
 
-  if (state.step > STEP_HALT || state.press >= PRESS_FAULT) (state.step = STEP_HALT);
+  if ((state.step > STEP_HALT) || (state.press > PRESS_FAULT)) (state.step = STEP_HALT);
   else if (state.press == PRESS_OPEN) (state.step = STEP_DOWN);
   else (state.step = STEP_UP);
 
@@ -73,7 +73,7 @@ static inline void mode_manual(void) {
     state.idle_us = state.time_us;
   }
 
-  if (state.step > STEP_HALT || state.press >= PRESS_FAULT) (state.step = STEP_HALT);
+  if ((state.step > STEP_HALT) || (state.press > PRESS_FAULT)) (state.step = STEP_HALT);
 
   execute_step[state.step]();
 }
