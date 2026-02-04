@@ -5,11 +5,11 @@ void setup() {
   idle_disconnect_gpio();
   idle_power_save();
 
-  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                      | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
+  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                       | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
 
-  NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                       | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
+  NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                        | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
 
   NRF_CLOCK->TASKS_HFCLKSTART = CLOCK_TASKS_HFCLKSTART_TASKS_HFCLKSTART_Trigger;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
@@ -32,8 +32,8 @@ void loop() {
 
 static inline void mode_boot(void) {
 
-  if (state.press == PRESS_FAULT) state.step = STEP_HALT;
-  else state.step = STEP_UP;
+  if (state.press == PRESS_FAULT) (state.step = STEP_HALT);
+  else (state.step = STEP_UP);
 
   execute_step[state.step]();
 
@@ -45,9 +45,9 @@ static inline void mode_boot(void) {
 
 static inline void mode_auto(void) {
 
-  if (state.press == PRESS_FAULT) state.step = STEP_HALT;
-  else if (state.press == PRESS_OPEN) state.step = STEP_DOWN;
-  else state.step = STEP_UP;
+  if (state.press == PRESS_FAULT) (state.step = STEP_HALT);
+  else if (state.press == PRESS_OPEN) (state.step = STEP_DOWN);
+  else (state.step = STEP_UP);
 
   execute_step[state.step]();
 
@@ -78,7 +78,7 @@ static inline void state_idle(void) {
   const int32_t idle_us = (state.time_us - state.idle_us);
   if (idle_us >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
   else if (idle_us >= POWER_SAVE_TIMEOUT_M) idle_power_save();
-  else if (state.power == POWER_ACTIVE && state.press == PRESS_OPEN) idle_detect();
+  else if ((state.power == POWER_ACTIVE) && (state.press == PRESS_OPEN)) idle_detect();
 }
 
 static inline void state_down(void) {
@@ -89,7 +89,7 @@ static inline void state_down(void) {
     servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
     NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
     state.latch = LATCH_ON;
-  } else {
+  } else if (state.press == PRESS_CLOSED) {
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
   }
@@ -103,7 +103,7 @@ static inline void state_up(void) {
     servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
     NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
     state.latch = LATCH_ON;
-  } else {
+  } else if (state.press == PRESS_OPEN) {
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
   }
@@ -122,8 +122,8 @@ static inline void state_reset(void) {
   else if (pressed_us < S_TO_US(5)) (state.blink_us = HZ_TO_US(120));
   else {
 
-    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                      | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                       | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
@@ -154,8 +154,8 @@ static inline void state_halt(void) {
 
 static inline void idle_power_wakeup(void) {
 
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                    | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos);
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                     | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
@@ -197,7 +197,7 @@ static inline void idle_detect(void) {
     sensor.VL53L4CD_GetRawResult(&raw_result);
     sensor.VL53L4CD_ClearInterrupt();
 
-    const bool object_detected = (raw_result.range_status == 9 && __builtin_bswap16(raw_result.distance) < SENSOR_DISTANCE_MM);
+    const bool object_detected = ((raw_result.range_status == 9) && (__builtin_bswap16(raw_result.distance) < SENSOR_DISTANCE_MM));
     detect_history = ((detect_history << 1) | (!!object_detected));
 
     if (detect_history == UINT8_MAX) {
@@ -210,12 +210,12 @@ static inline void idle_detect(void) {
 }
 
 static inline void idle_power_save(void) {
-  
+
   Wire.end();
   Serial1.end();
 
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                    | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                     | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
@@ -229,12 +229,12 @@ static inline void idle_shutdown(void) {
 
   idle_disconnect_gpio();
 
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                    | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos);
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                     | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
 
-  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = (GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                      | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos)
-                                      | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                       | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos)
+                                       | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos));
 
   NRF_TIMER0->TASKS_STOP = TIMER_TASKS_STOP_TASKS_STOP_Trigger;
   NRF_CLOCK->TASKS_HFCLKSTOP = CLOCK_TASKS_HFCLKSTOP_TASKS_HFCLKSTOP_Trigger;
