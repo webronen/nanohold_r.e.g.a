@@ -27,12 +27,14 @@ void loop() {
 
   if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) idle_power_wakeup();
 
+  if (state.mode > MODE_HALT || state.press >= PRESS_FAULT) (state.mode = MODE_HALT);
+
   change_mode[state.mode]();
 }
 
 static inline void mode_boot(void) {
 
-  if (state.press == PRESS_FAULT) (state.step = STEP_HALT);
+  if (state.step > STEP_HALT || state.press >= PRESS_FAULT) (state.step = STEP_HALT);
   else (state.step = STEP_UP);
 
   execute_step[state.step]();
@@ -45,7 +47,7 @@ static inline void mode_boot(void) {
 
 static inline void mode_auto(void) {
 
-  if (state.press == PRESS_FAULT) (state.step = STEP_HALT);
+  if (state.step > STEP_HALT || state.press >= PRESS_FAULT) (state.step = STEP_HALT);
   else if (state.press == PRESS_OPEN) (state.step = STEP_DOWN);
   else (state.step = STEP_UP);
 
@@ -71,6 +73,8 @@ static inline void mode_manual(void) {
     state.idle_us = state.time_us;
   }
 
+  if (state.step > STEP_HALT || state.press >= PRESS_FAULT) (state.step = STEP_HALT);
+
   execute_step[state.step]();
 }
 
@@ -87,9 +91,9 @@ static inline void state_down(void) {
 
   if ((state.latch == LATCH_OFF) && (state.press == PRESS_OPEN)) {
     servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
-    NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
     state.latch = LATCH_ON;
   } else if (state.press == PRESS_CLOSED) {
+    NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
   }
@@ -101,9 +105,9 @@ static inline void state_up(void) {
 
   if ((state.latch == LATCH_OFF) && (state.press == PRESS_CLOSED)) {
     servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
-    NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
     state.latch = LATCH_ON;
   } else if (state.press == PRESS_OPEN) {
+    NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
   }
@@ -140,10 +144,10 @@ static inline void state_reset(void) {
       ;
   }
 
-  state_halt();
+  state_blink();
 }
 
-static inline void state_halt(void) {
+static inline void state_blink(void) {
   static uint32_t history_us = 0;
   if ((int32_t)(state.time_us - history_us) >= 0) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
