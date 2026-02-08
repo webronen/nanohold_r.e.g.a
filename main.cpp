@@ -16,7 +16,7 @@ void setup() {
     ;
 
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = TIMER_PRESCALER_PRESCALER_1Mhz;
+  NRF_TIMER0->PRESCALER = TIMER_PRESCALER_PRESCALER_1MHZ;
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
 }
 
@@ -294,10 +294,7 @@ static inline void servo_read_position(const uint8_t id) {
   request.checksum = ~(id + 0x40);
 
   Serial1.write((uint8_t*)&request, sizeof(ServoReadRequest_t));
-  Serial1.flush();
-
-  while (Serial1.read() != -1)
-    ;
+  servo_flush_clear();
 
   static ServoReadResponse_t response;
   Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
@@ -305,7 +302,7 @@ static inline void servo_read_position(const uint8_t id) {
   if (response.error == 0) state.position = __builtin_bswap16(response.data);
 }
 
-static inline void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed) {
+static void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed) {
 
   static ServoWritePosition_t request = {
     .header = { 0xFF, 0xFF },
@@ -325,10 +322,7 @@ static inline void servo_write_position(const uint8_t id, const uint16_t positio
   request.checksum = ~(id + 0x36 + (position >> 8) + (position & 0xFF) + (speed >> 8) + (speed & 0xFF));
 
   Serial1.write((uint8_t*)&request, sizeof(ServoWritePosition_t));
-  Serial1.flush();
-
-  while (Serial1.read() != -1)
-    ;
+  servo_flush_clear();
 }
 
 static inline void servo_read_load(const uint8_t id) {
@@ -347,10 +341,7 @@ static inline void servo_read_load(const uint8_t id) {
   request.checksum = ~(id + 0x40);
 
   Serial1.write((uint8_t*)&request, sizeof(ServoReadRequest_t));
-  Serial1.flush();
-
-  while (Serial1.read() != -1)
-    ;
+  servo_flush_clear();
 
   static ServoReadResponse_t response;
   Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
@@ -360,4 +351,10 @@ static inline void servo_read_load(const uint8_t id) {
     if (raw & (1 << 10)) state.load = -(raw & 0x03FF);
     else state.load = (raw & 0x03FF);
   }
+}
+
+static void servo_flush_clear(void) {
+  Serial1.flush();
+  while (Serial1.read() != -1)
+    ;
 }
