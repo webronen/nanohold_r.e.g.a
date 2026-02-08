@@ -5,18 +5,18 @@ void setup() {
   idle_disconnect_gpio();
   idle_power_save();
 
-  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                       | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
+  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                           | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
 
-  NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                        | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
+  NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                            | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
 
   NRF_CLOCK->TASKS_HFCLKSTART = CLOCK_TASKS_HFCLKSTART_TASKS_HFCLKSTART_Trigger;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     ;
 
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
-  NRF_TIMER0->PRESCALER = 4;  // 1 MHz (1us Tick)
+  NRF_TIMER0->PRESCALER = TIMER_PRESCALER_PRESCALER_1Mhz;
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
 }
 
@@ -27,14 +27,14 @@ void loop() {
 
   if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) idle_power_wakeup();
 
-  if ((state.mode > MODE_HALT) || (state.press > PRESS_FAULT)) (state.mode = MODE_HALT);
+  if ((state.mode > MODE_HALT) || (state.press > PRESS_HALT)) (state.mode = MODE_HALT);
 
   change_mode[state.mode]();
 }
 
 static inline void mode_boot(void) {
 
-  if ((state.step > STEP_HALT) || (state.press > PRESS_FAULT)) (state.step = STEP_HALT);
+  if ((state.step > STEP_HALT) || (state.press > PRESS_HALT)) (state.step = STEP_HALT);
   else (state.step = STEP_UP);
 
   execute_step[state.step]();
@@ -47,7 +47,7 @@ static inline void mode_boot(void) {
 
 static inline void mode_auto(void) {
 
-  if ((state.step > STEP_HALT) || (state.press > PRESS_FAULT)) (state.step = STEP_HALT);
+  if ((state.step > STEP_HALT) || (state.press > PRESS_HALT)) (state.step = STEP_HALT);
   else if (state.press == PRESS_OPEN) (state.step = STEP_DOWN);
   else (state.step = STEP_UP);
 
@@ -63,8 +63,8 @@ static inline void mode_manual(void) {
 
   static uint8_t button_history = 0;
 
-  state.buttons = (StepState_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON))) << 1)
-                                | ((!(NRF_P0->IN & (1 << GPIO_RIGHT_BUTTON))) << 0));
+  state.buttons = (StepState_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON_PIN))) << 1)
+                                | ((!(NRF_P0->IN & (1 << GPIO_RIGHT_BUTTON_PIN))) << 0));
 
   button_history = ((button_history << 1) | (!!state.buttons));
 
@@ -73,7 +73,7 @@ static inline void mode_manual(void) {
     state.idle_us = state.time_us;
   }
 
-  if ((state.step > STEP_HALT) || (state.press > PRESS_FAULT)) (state.step = STEP_HALT);
+  if ((state.step > STEP_HALT) || (state.press > PRESS_HALT)) (state.step = STEP_HALT);
 
   execute_step[state.step]();
 }
@@ -87,27 +87,38 @@ static inline void state_idle(void) {
 
 static inline void state_down(void) {
 
-  state.press = (PressState_t)(servo.ReadLoad(SERVO_DEFAULT_ID) < PRESS_LOAD_LIMIT);
+  servo_read_load(1);
+  state.press = (PressState_t)(state.load < PRESS_LOAD_LIMIT);
 
-  if ((state.latch == LATCH_OFF) && (state.press == PRESS_OPEN)) {
-    servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
-    state.latch = LATCH_ON;
-  } else if (state.press == PRESS_CLOSED) {
-    NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
-    state.latch = LATCH_OFF;
-    state.step = STEP_IDLE;
-  }
+  // if ((state.latch == LATCH_OFF) && (state.press == PRESS_OPEN)) {
+  //   servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
+  //   state.latch = LATCH_ON;
+  // } else if (state.press == PRESS_CLOSED) {
+  //   NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
+  //   state.latch = LATCH_OFF;
+  //   state.step = STEP_IDLE;
+  // }
 }
 
 static inline void state_up(void) {
 
-  state.press = (PressState_t)(servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
+  // state.press = (PressState_t)(servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
 
-  if ((state.latch == LATCH_OFF) && (state.press == PRESS_CLOSED)) {
-    servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
-    state.latch = LATCH_ON;
-  } else if (state.press == PRESS_OPEN) {
+  // if ((state.latch == LATCH_OFF) && (state.press == PRESS_CLOSED)) {
+  //   servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
+  //   state.latch = LATCH_ON;
+  // } else if (state.press == PRESS_OPEN) {
+  //   NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
+  //   state.latch = LATCH_OFF;
+  //   state.step = STEP_IDLE;
+  // }
+
+  if ((state.latch == LATCH_OFF)) {
     NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
+    state.latch = LATCH_ON;
+    state.press = PRESS_OPEN;
+    delay(1000);
+  } else {
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
   }
@@ -126,12 +137,14 @@ static inline void state_reset(void) {
   else if (pressed_us < S_TO_US(5)) (state.blink_us = HZ_TO_US(120));
   else {
 
+    idle_end_buses();
+
     NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                                        | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
 
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
-    delay(S_TO_MS(1));
+    delay(1000);
 
     __disable_irq();
 
@@ -163,23 +176,22 @@ static inline void idle_power_wakeup(void) {
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
+  NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
+  NRF_P1->OUTSET = (1UL << SERVO_RX_PULLUP_PIN);
+
   Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
-  Serial1.setPins(UART_RX_PIN, UART_TX_PIN);
-  Serial1.begin(UART_BAUDRATE_1M);
-  servo.pSerial = &Serial1;
+  Serial1.begin(SERIAL_BAUDRATE_1M);  // RX: P1.01, TX: P1.02
 
   for (uint8_t i = 0; i < 120; i++) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
-    delay(HZ_TO_MS(12));
+    delayMicroseconds(8333);
   }
 
   sensor.VL53L4CD_SensorInit();
   sensor.VL53L4CD_StartRanging();
-
-  servo.EnableTorque(SERVO_DEFAULT_ID, true);
 
   state.range = RANGE_ACTIVE;
   state.power = POWER_ACTIVE;
@@ -215,10 +227,12 @@ static inline void idle_detect(void) {
 
 static inline void idle_power_save(void) {
 
-  Wire.end();
-  Serial1.end();
+  idle_end_buses();
+
+  NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                     | (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
                                      | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
@@ -228,17 +242,17 @@ static inline void idle_power_save(void) {
 
 static inline void idle_shutdown(void) {
 
-  Wire.end();
-  Serial1.end();
-
+  idle_end_buses();
   idle_disconnect_gpio();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                     | (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
                                      | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
 
-  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                       | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos)
-                                       | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos));
+  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                           | (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
+                                           | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos)
+                                           | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos));
 
   NRF_TIMER0->TASKS_STOP = TIMER_TASKS_STOP_TASKS_STOP_Trigger;
   NRF_CLOCK->TASKS_HFCLKSTOP = CLOCK_TASKS_HFCLKSTOP_TASKS_HFCLKSTOP_Trigger;
@@ -258,4 +272,101 @@ static inline void idle_shutdown(void) {
 static void idle_disconnect_gpio(void) {
   for (uint8_t i = 0; i < 32; i++) NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
   for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+}
+
+static void idle_end_buses(void) {
+  Wire.endTransmission(true);
+  Wire.flush();
+  while (Wire.read() != -1)
+    ;
+  Wire.end();
+
+  Serial1.flush();
+  while (Serial1.read() != -1)
+    ;
+  Serial1.end();
+}
+
+static inline void servo_read_position(const uint8_t id) {
+
+  static ServoReadRequest_t request = {
+    .header = { 0xFF, 0xFF },
+    .id = id,
+    .length = 0x04,
+    .instruction = 0x02,
+    .address = 0x38,
+    .read_length = 0x02,
+    .checksum = 0
+  };
+
+  request.id = id;
+  request.checksum = ~(id + 0x40);
+
+  Serial1.write((uint8_t*)&request, sizeof(ServoReadRequest_t));
+  Serial1.flush();
+
+  while (Serial1.read() != -1)
+    ;
+
+  static ServoReadResponse_t response;
+  Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
+
+  if (response.error == 0) state.position = __builtin_bswap16(response.data);
+}
+
+static inline void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed) {
+
+  static ServoWritePosition_t request = {
+    .header = { 0xFF, 0xFF },
+    .id = 0,
+    .length = 0x09,
+    .instruction = 0x03,
+    .address = 0x2A,
+    .position = 0,
+    .time = 0x0000,
+    .speed = 0,
+    .checksum = 0
+  };
+
+  request.id = id;
+  request.position = __builtin_bswap16(position);
+  request.speed = __builtin_bswap16(speed);
+  request.checksum = ~(id + 0x36 + (position >> 8) + (position & 0xFF) + (speed >> 8) + (speed & 0xFF));
+
+  Serial1.write((uint8_t*)&request, sizeof(ServoWritePosition_t));
+  Serial1.flush();
+
+  while (Serial1.read() != -1)
+    ;
+}
+
+static inline void servo_read_load(const uint8_t id) {
+
+  static ServoReadRequest_t request = {
+    .header = { 0xFF, 0xFF },
+    .id = 0,
+    .length = 0x04,
+    .instruction = 0x02,
+    .address = 0x3C,
+    .read_length = 0x02,
+    .checksum = 0
+  };
+
+  request.id = id;
+  request.checksum = ~(id + 0x40);
+
+  Serial1.write((uint8_t*)&request, sizeof(ServoReadRequest_t));
+  Serial1.flush();
+
+  while (Serial1.read() != -1)
+    ;
+
+  static ServoReadResponse_t response;
+  Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
+
+  if (response.error == 0) {
+    const uint16_t raw = __builtin_bswap16(response.data) & 0x07FF;
+    if (raw & (1 << 10)) state.load = -(raw & 0x03FF);
+    else state.load = (raw & 0x03FF);
+  }
 }
