@@ -5,7 +5,6 @@
 
 #include <Adafruit_TinyUSB.h>
 #include <vl53l4cd_class.h>
-#include <SCServo.h>
 
 #define HZ_TO_US(hz) (1000000UL / (hz))
 #define HZ_TO_MS(hz) (1000UL / (hz))
@@ -16,33 +15,32 @@
 #define POWER_SAVE_TIMEOUT_M M_TO_US(1)
 #define SHUTDOWN_TIMEOUT_M M_TO_US(5)
 
-#define LDO_ENABLE_PIN 13
+// (Port 0: 0 .. 31, Port 1: 32 + (0 .. 15)
+#define LDO_ENABLE_PIN 13         // P0.13
+#define SERVO_RX_PULLUP_PIN 7     // P1.07
+#define I2C_CLK_PIN 36            // P1.04
+#define I2C_SDA_PIN 38            // P1.06
+#define GPIO_STATUS_PIN 11        // P0.11
+#define GPIO_RIGHT_BUTTON_PIN 24  // P0.24
+#define GPIO_LEFT_BUTTON_PIN 0    // P1.00
+
+#define TIMER_PRESCALER_PRESCALER_1Mhz 4  // (1us Tick)
 #define SERIAL_BAUDRATE_1M 115200
 #define I2C_FREQUENCY_400K 400000
-#define I2C_CLK_PIN 36  // P1.04
-#define I2C_SDA_PIN 38  // P1.06
 #define UART_BAUDRATE_1M 1000000
-#define UART_RX_PIN 29  // P0.29
-#define UART_TX_PIN 47  // P1.15
 
 #define SENSOR_DISTANCE_MM 30
 
-#define GPIO_STATUS_PIN 11    // P0.11
-#define GPIO_RIGHT_BUTTON 24  // P0.24
-#define GPIO_LEFT_BUTTON 0    // P1.00
-
 #define SERVO_DEFAULT_ID 1
 
-#define PRESS_UP_POSITION 0    // ?
-#define PRESS_DOWN_POSITION 0  // ?
-#define PRESS_LOAD_LIMIT 0     // ?
+#define PRESS_UP_POSITION 75
+#define PRESS_DOWN_POSITION 300
+#define PRESS_LOAD_LIMIT 50
 
-#define PRESS_STATE_COUNT 5
 #define PRESS_UP_SPEED 150
-#define PRESS_DOWN_SPEED 300
+#define PRESS_DOWN_SPEED 150
 
 VL53L4CD sensor(&Wire, -1);
-SCSCL servo;
 
 typedef void (*ModeSelect_t)(void);
 typedef void (*StepSelect_t)(void);
@@ -51,6 +49,7 @@ typedef enum StepMode {
   MODE_BOOT = 0,
   MODE_AUTO = 1,
   MODE_MANUAL = 2,
+  MODE_HALT = 3
 } StepMode_t;
 
 typedef enum StepState {
@@ -64,7 +63,7 @@ typedef enum StepState {
 typedef enum PressState {
   PRESS_CLOSED = 0,
   PRESS_OPEN = 1,
-  PRESS_FAULT = 2,
+  PRESS_HALT = 2,
 } PressState_t;
 
 typedef enum LatchState {
@@ -90,12 +89,13 @@ static inline void state_idle(void);
 static inline void state_down(void);
 static inline void state_up(void);
 static inline void state_reset(void);
-static inline void state_halt(void);
+static inline void state_blink(void);
 
 static const ModeSelect_t change_mode[] = {
   [MODE_BOOT] = mode_boot,
   [MODE_AUTO] = mode_auto,
-  [MODE_MANUAL] = mode_manual
+  [MODE_MANUAL] = mode_manual,
+  [MODE_HALT] = state_blink
 };
 
 static const StepSelect_t execute_step[] = {
@@ -103,10 +103,41 @@ static const StepSelect_t execute_step[] = {
   [STEP_DOWN] = state_down,
   [STEP_UP] = state_up,
   [STEP_RESET] = state_reset,
-  [STEP_HALT] = state_halt
+  [STEP_HALT] = state_blink
 };
 
-typedef struct {
+typedef struct __attribute__((packed)) ServoReadRequest {
+  uint8_t header[2];
+  uint8_t id;
+  uint8_t length;
+  uint8_t instruction;
+  uint8_t address;
+  uint8_t read_length;
+  uint8_t checksum;
+} ServoReadRequest_t;
+
+typedef struct __attribute__((packed)) ServoWritePosition {
+  uint8_t header[2];
+  uint8_t id;
+  uint8_t length;
+  uint8_t instruction;
+  uint8_t address;
+  uint16_t position;
+  uint16_t time;
+  uint16_t speed;
+  uint8_t checksum;
+} ServoWritePosition_t;
+
+typedef struct __attribute__((packed)) ServoReadResponse {
+  uint8_t header[2];
+  uint8_t id;
+  uint8_t length;
+  uint8_t error;
+  uint16_t data;
+  uint8_t checksum;
+} ServoReadResponse_t;
+
+typedef struct __attribute__((packed)) SystemState {
   uint32_t time_us;
   uint32_t idle_us;
   uint32_t blink_us;
@@ -117,6 +148,8 @@ typedef struct {
   LatchState_t latch;
   PowerState_t power;
   RangeState_t range;
+  uint16_t position;
+  int16_t load;
 } SystemState_t;
 
 static SystemState_t state = {
@@ -137,5 +170,10 @@ static inline void idle_detect(void);
 static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
 static void idle_disconnect_gpio(void);
+static void idle_end_buses(void);
+
+static inline void servo_read_position(const uint8_t id);
+static inline void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed);
+static inline void servo_read_load(const uint8_t id);
 
 #endif  // MAIN_H
