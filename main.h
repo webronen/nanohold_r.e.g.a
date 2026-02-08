@@ -24,7 +24,7 @@
 #define GPIO_RIGHT_BUTTON_PIN 24  // P0.24
 #define GPIO_LEFT_BUTTON_PIN 0    // P1.00
 
-#define TIMER_PRESCALER_PRESCALER_1Mhz 4  // (1us Tick)
+#define TIMER_PRESCALER_PRESCALER_1MHZ 4  // (1us Tick)
 #define SERIAL_BAUDRATE_1M 115200
 #define I2C_FREQUENCY_400K 400000
 #define UART_BAUDRATE_1M 1000000
@@ -172,7 +172,8 @@ static void idle_disconnect_gpio(void);
 static void idle_end_buses(void);
 
 static inline void servo_read_position(const uint8_t id);
-static inline void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed);
+static void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed);
 static inline void servo_read_load(const uint8_t id);
+static void servo_flush_clear(void);
 
 #endif  // MAIN_H
