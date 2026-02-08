@@ -27,14 +27,14 @@ void loop() {
 
   if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) idle_power_wakeup();
 
-  if ((state.mode > MODE_HALT) || (state.press > PRESS_HALT)) (state.mode = MODE_HALT);
+  if (state.mode > MODE_HALT) (state.mode = MODE_HALT);
 
   change_mode[state.mode]();
 }
 
 static inline void mode_boot(void) {
 
-  if ((state.step > STEP_HALT) || (state.press > PRESS_HALT)) (state.step = STEP_HALT);
+  if (state.step > STEP_HALT) (state.step = STEP_HALT);
   else (state.step = STEP_UP);
 
   execute_step[state.step]();
@@ -47,7 +47,7 @@ static inline void mode_boot(void) {
 
 static inline void mode_auto(void) {
 
-  if ((state.step > STEP_HALT) || (state.press > PRESS_HALT)) (state.step = STEP_HALT);
+  if (state.step > STEP_HALT) (state.step = STEP_HALT);
   else if (state.press == PRESS_OPEN) (state.step = STEP_DOWN);
   else (state.step = STEP_UP);
 
@@ -73,7 +73,7 @@ static inline void mode_manual(void) {
     state.idle_us = state.time_us;
   }
 
-  if ((state.step > STEP_HALT) || (state.press > PRESS_HALT)) (state.step = STEP_HALT);
+  if (state.step > STEP_HALT) (state.step = STEP_HALT);
 
   execute_step[state.step]();
 }
@@ -88,37 +88,28 @@ static inline void state_idle(void) {
 static inline void state_down(void) {
 
   servo_read_load(1);
-  state.press = (PressState_t)(state.load < PRESS_LOAD_LIMIT);
+  state.press = (PressState_t)(state.load <= PRESS_LOAD_LIMIT);
 
-  // if ((state.latch == LATCH_OFF) && (state.press == PRESS_OPEN)) {
-  //   servo.WritePos(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, 0, PRESS_DOWN_SPEED);
-  //   state.latch = LATCH_ON;
-  // } else if (state.press == PRESS_CLOSED) {
-  //   NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
-  //   state.latch = LATCH_OFF;
-  //   state.step = STEP_IDLE;
-  // }
+  if ((state.latch == LATCH_OFF) && (state.press == PRESS_OPEN)) {
+    servo_write_position(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, PRESS_DOWN_SPEED);
+    state.latch = LATCH_ON;
+  } else if (state.press == PRESS_CLOSED) {
+    NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
+    state.latch = LATCH_OFF;
+    state.step = STEP_IDLE;
+  }
 }
 
 static inline void state_up(void) {
 
-  // state.press = (PressState_t)(servo.ReadPos(SERVO_DEFAULT_ID) >= PRESS_UP_POSITION);
+  servo_read_position(1);
+  state.press = (PressState_t)(state.position <= PRESS_UP_POSITION);
 
-  // if ((state.latch == LATCH_OFF) && (state.press == PRESS_CLOSED)) {
-  //   servo.WritePos(SERVO_DEFAULT_ID, PRESS_UP_POSITION, 0, PRESS_UP_SPEED);
-  //   state.latch = LATCH_ON;
-  // } else if (state.press == PRESS_OPEN) {
-  //   NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
-  //   state.latch = LATCH_OFF;
-  //   state.step = STEP_IDLE;
-  // }
-
-  if ((state.latch == LATCH_OFF)) {
-    NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
+  if ((state.latch == LATCH_OFF) && (state.press == PRESS_CLOSED)) {
+    servo_write_position(SERVO_DEFAULT_ID, PRESS_UP_POSITION, PRESS_UP_SPEED);
     state.latch = LATCH_ON;
-    state.press = PRESS_OPEN;
-    delay(1000);
-  } else {
+  } else if (state.press == PRESS_OPEN) {
+    NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
   }
