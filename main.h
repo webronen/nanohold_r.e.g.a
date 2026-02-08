@@ -63,7 +63,6 @@ typedef enum StepState {
 typedef enum PressState {
   PRESS_CLOSED = 0,
   PRESS_OPEN = 1,
-  PRESS_HALT = 2,
 } PressState_t;
 
 typedef enum LatchState {
