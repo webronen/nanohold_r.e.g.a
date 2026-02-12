@@ -166,7 +166,6 @@ static inline void idle_detect(void);
 static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
 static void idle_disconnect_gpio(void);
-static void idle_end_buses(void);
 
 static inline void servo_read_position(const uint8_t id);
 static void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed);
