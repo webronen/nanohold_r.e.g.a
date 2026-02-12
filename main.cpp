@@ -10,8 +10,6 @@ void setup() {
   NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                                             | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
 
-  NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
-
   NRF_CLOCK->TASKS_HFCLKSTART = CLOCK_TASKS_HFCLKSTART_TASKS_HFCLKSTART_Trigger;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     ;
@@ -162,6 +160,7 @@ static inline void idle_power_wakeup(void) {
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
+  NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
   NRF_P1->OUTCLR = (1UL << SERVO_RX_PULLUP_PIN);
   delay(1);
   NRF_P1->OUTSET = (1UL << SERVO_RX_PULLUP_PIN);
@@ -170,8 +169,6 @@ static inline void idle_power_wakeup(void) {
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
-  Serial1.begin(SERVO_BAUDRATE_1M);  // RX: P1.01, TX: P1.02
-
   for (uint8_t i = 0; i < 120; i++) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
     delayMicroseconds(8333);
@@ -179,6 +176,8 @@ static inline void idle_power_wakeup(void) {
 
   sensor.VL53L4CD_SensorInit();
   sensor.VL53L4CD_StartRanging();
+
+  Serial1.begin(SERVO_BAUDRATE_1M);  // RX: P1.01, TX: P1.02
 
   state.range = RANGE_ACTIVE;
   state.power = POWER_ACTIVE;
@@ -214,20 +213,19 @@ static inline void idle_detect(void) {
 
 static inline void idle_power_save(void) {
 
-  idle_end_buses();
-
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                                      | (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
                                      | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
 
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
+  NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
   state.power = POWER_IDLE;
 }
 
 static inline void idle_shutdown(void) {
 
-  idle_end_buses();
   idle_disconnect_gpio();
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
@@ -256,19 +254,6 @@ static inline void idle_shutdown(void) {
 static void idle_disconnect_gpio(void) {
   for (uint8_t i = 0; i < 32; i++) NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
   for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-}
-
-static void idle_end_buses(void) {
-
-  Wire.flush();
-  while (Wire.read() != -1)
-    ;
-  Wire.end();
-
-  Serial1.flush();
-  while (Serial1.read() != -1)
-    ;
-  Serial1.end();
 }
 
 static inline void servo_read_position(const uint8_t id) {
@@ -350,5 +335,5 @@ static void servo_flush_clear(void) {
   Serial1.flush();
   while (Serial1.read() != -1)
     ;
-  delay(1);
+  delay(10);
 }
