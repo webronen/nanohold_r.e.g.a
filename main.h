@@ -25,17 +25,16 @@
 #define GPIO_LEFT_BUTTON_PIN 0    // P1.00
 
 #define TIMER_PRESCALER_PRESCALER_1MHZ 4  // (1us Tick)
-#define SERIAL_BAUDRATE_1M 115200
+#define SERVO_BAUDRATE_1M 1000000
 #define I2C_FREQUENCY_400K 400000
-#define UART_BAUDRATE_1M 1000000
 
 #define SENSOR_DISTANCE_MM 30
 
 #define SERVO_DEFAULT_ID 1
 
-#define PRESS_UP_POSITION 75
+#define PRESS_UP_POSITION 80
 #define PRESS_DOWN_POSITION 300
-#define PRESS_LOAD_LIMIT 50
+#define PRESS_LOAD_LIMIT 250
 
 #define PRESS_UP_SPEED 150
 #define PRESS_DOWN_SPEED 150
@@ -49,7 +48,6 @@ typedef enum StepMode {
   MODE_BOOT = 0,
   MODE_AUTO = 1,
   MODE_MANUAL = 2,
-  MODE_HALT = 3
 } StepMode_t;
 
 typedef enum StepState {
@@ -57,7 +55,6 @@ typedef enum StepState {
   STEP_DOWN = 1,
   STEP_UP = 2,
   STEP_RESET = 3,
-  STEP_HALT = 4
 } StepState_t;
 
 typedef enum PressState {
@@ -94,7 +91,6 @@ static const ModeSelect_t change_mode[] = {
   [MODE_BOOT] = mode_boot,
   [MODE_AUTO] = mode_auto,
   [MODE_MANUAL] = mode_manual,
-  [MODE_HALT] = state_blink
 };
 
 static const StepSelect_t execute_step[] = {
@@ -102,7 +98,6 @@ static const StepSelect_t execute_step[] = {
   [STEP_DOWN] = state_down,
   [STEP_UP] = state_up,
   [STEP_RESET] = state_reset,
-  [STEP_HALT] = state_blink
 };
 
 typedef struct __attribute__((packed)) ServoReadRequest {
@@ -161,7 +156,9 @@ static SystemState_t state = {
   .press = PRESS_CLOSED,
   .latch = LATCH_OFF,
   .power = POWER_IDLE,
-  .range = RANGE_IDLE
+  .range = RANGE_IDLE,
+  .position = PRESS_DOWN_POSITION,
+  .load = PRESS_LOAD_LIMIT
 };
 
 static inline void idle_power_wakeup(void);
