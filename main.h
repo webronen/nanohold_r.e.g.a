@@ -7,10 +7,8 @@
 #include <vl53l4cd_class.h>
 
 #define HZ_TO_US(hz) (1000000UL / (hz))
-#define HZ_TO_MS(hz) (1000UL / (hz))
 #define M_TO_US(m) ((m)*60 * 1000000UL)
 #define S_TO_US(s) ((s)*1000000UL)
-#define S_TO_MS(s) ((s)*1000UL)
 
 #define POWER_SAVE_TIMEOUT_M M_TO_US(1)
 #define SHUTDOWN_TIMEOUT_M M_TO_US(5)
@@ -31,13 +29,10 @@
 #define SENSOR_DISTANCE_MM 30
 
 #define SERVO_DEFAULT_ID 1
-
-#define PRESS_UP_POSITION 80
-#define PRESS_DOWN_POSITION 300
-#define PRESS_LOAD_LIMIT 250
-
-#define PRESS_UP_SPEED 150
-#define PRESS_DOWN_SPEED 150
+#define SERVO_UP_POSITION 80
+#define SERVO_DOWN_POSITION 300
+#define SERVO_UP_SPEED 150
+#define SERVO_DOWN_SPEED 150
 
 VL53L4CD sensor(&Wire, -1);
 
@@ -110,6 +105,16 @@ typedef struct __attribute__((packed)) ServoReadRequest {
   uint8_t checksum;
 } ServoReadRequest_t;
 
+typedef struct __attribute__((packed)) ServoWriteRequest {
+  uint8_t header[2];
+  uint8_t id;
+  uint8_t length;
+  uint8_t instruction;
+  uint8_t address;
+  uint8_t data;
+  uint8_t checksum;
+} ServoWriteRequest_t;
+
 typedef struct __attribute__((packed)) ServoWritePosition {
   uint8_t header[2];
   uint8_t id;
@@ -142,8 +147,7 @@ typedef struct __attribute__((packed)) SystemState {
   LatchState_t latch;
   PowerState_t power;
   RangeState_t range;
-  uint16_t position;
-  int16_t load;
+  bool is_moving;
 } SystemState_t;
 
 static SystemState_t state = {
@@ -157,8 +161,7 @@ static SystemState_t state = {
   .latch = LATCH_OFF,
   .power = POWER_IDLE,
   .range = RANGE_IDLE,
-  .position = PRESS_DOWN_POSITION,
-  .load = PRESS_LOAD_LIMIT
+  .is_moving = false
 };
 
 static inline void idle_power_wakeup(void);
@@ -167,9 +170,11 @@ static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
 static void idle_disconnect_gpio(void);
 
-static inline void servo_read_position(const uint8_t id);
+//static inline void servo_read_position(const uint8_t id);
 static void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed);
-static inline void servo_read_load(const uint8_t id);
+//static inline void servo_read_load(const uint8_t id);
+static void servo_is_moving(const uint8_t id);
+static void servo_enable_torque(const uint8_t id, const bool enable);
 static void servo_flush_clear(void);
 
 #endif  // MAIN_H
