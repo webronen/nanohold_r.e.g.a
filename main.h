@@ -29,8 +29,6 @@
 #define SENSOR_DISTANCE_MM 30
 
 #define SERVO_DEFAULT_ID 1
-#define SERVO_UP_POSITION 80
-#define SERVO_DOWN_POSITION 300
 #define SERVO_UP_SPEED 150
 #define SERVO_DOWN_SPEED 150
 
@@ -147,7 +145,6 @@ typedef struct __attribute__((packed)) SystemState {
   LatchState_t latch;
   PowerState_t power;
   RangeState_t range;
-  bool is_moving;
 } SystemState_t;
 
 static SystemState_t state = {
@@ -160,8 +157,7 @@ static SystemState_t state = {
   .press = PRESS_CLOSED,
   .latch = LATCH_OFF,
   .power = POWER_IDLE,
-  .range = RANGE_IDLE,
-  .is_moving = false
+  .range = RANGE_IDLE
 };
 
 static inline void idle_power_wakeup(void);
@@ -170,10 +166,8 @@ static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
 static void idle_disconnect_gpio(void);
 
-//static inline void servo_read_position(const uint8_t id);
 static void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed);
-//static inline void servo_read_load(const uint8_t id);
-static void servo_is_moving(const uint8_t id);
+static bool servo_is_moving(const uint8_t id);
 static void servo_enable_torque(const uint8_t id, const bool enable);
 static void servo_flush_clear(void);
 
