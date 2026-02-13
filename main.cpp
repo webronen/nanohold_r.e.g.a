@@ -79,7 +79,7 @@ static inline void state_idle(void) {
 static inline void state_down(void) {
 
   if (state.latch == LATCH_OFF) {
-    servo_write_position(SERVO_DEFAULT_ID, 1023, SERVO_DOWN_SPEED);
+    servo_write_position(SERVO_DEFAULT_ID, SERVO_DOWN_POSITION, SERVO_DOWN_SPEED);
     state.latch = LATCH_ON;
   }
 
@@ -96,7 +96,7 @@ static inline void state_down(void) {
 static inline void state_up(void) {
 
   if (state.latch == LATCH_OFF) {
-    servo_write_position(SERVO_DEFAULT_ID, 0, SERVO_UP_SPEED);
+    servo_write_position(SERVO_DEFAULT_ID, SERVO_UP_POSITION, SERVO_UP_SPEED);
     state.latch = LATCH_ON;
   }
 
