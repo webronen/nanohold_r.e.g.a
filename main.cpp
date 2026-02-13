@@ -106,6 +106,8 @@ static inline void state_up(void) {
 
   if (!state.is_moving && state.latch == LATCH_ON) {
     NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
+    delay(1000);
+    servo_enable_torque(SERVO_DEFAULT_ID, false);
     state.press = PRESS_OPEN;
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
