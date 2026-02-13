@@ -78,15 +78,17 @@ static inline void state_idle(void) {
 
 static inline void state_down(void) {
 
-  servo_read_load(1);
-
-  float limit = (state.latch == LATCH_OFF) ? PRESS_LOAD_LIMIT : PRESS_LOAD_LIMIT * 0.7f;
-
-  if (abs(state.load) <= limit) {
-    servo_write_position(SERVO_DEFAULT_ID, PRESS_DOWN_POSITION, PRESS_DOWN_SPEED);
+  if (state.latch == LATCH_OFF) {
+    servo_write_position(SERVO_DEFAULT_ID, SERVO_DOWN_POSITION, SERVO_DOWN_SPEED);
     state.latch = LATCH_ON;
-  } else {
+  }
+
+  servo_is_moving(SERVO_DEFAULT_ID);
+
+  if (!state.is_moving && state.latch == LATCH_ON) {
     NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
+    delay(1000);
+    servo_enable_torque(SERVO_DEFAULT_ID, false);
     state.press = PRESS_CLOSED;
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
@@ -95,16 +97,19 @@ static inline void state_down(void) {
 
 static inline void state_up(void) {
 
-  servo_read_position(1);
-
-  if (state.position > PRESS_UP_POSITION * 1.3f) {
-    servo_write_position(SERVO_DEFAULT_ID, PRESS_UP_POSITION, PRESS_UP_SPEED);
+  if (state.latch == LATCH_OFF) {
+    servo_write_position(SERVO_DEFAULT_ID, SERVO_UP_POSITION, SERVO_UP_SPEED);
     state.latch = LATCH_ON;
-  } else {
+  }
+
+  servo_is_moving(SERVO_DEFAULT_ID);
+
+  if (!state.is_moving && state.latch == LATCH_ON) {
     NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
     state.press = PRESS_OPEN;
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
+    delay(1000);
   }
 }
 
@@ -169,6 +174,8 @@ static inline void idle_power_wakeup(void) {
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
+  Serial1.begin(SERVO_BAUDRATE_1M);  // RX: P1.01, TX: P1.02
+
   for (uint8_t i = 0; i < 120; i++) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
     delayMicroseconds(8333);
@@ -176,8 +183,6 @@ static inline void idle_power_wakeup(void) {
 
   sensor.VL53L4CD_SensorInit();
   sensor.VL53L4CD_StartRanging();
-
-  Serial1.begin(SERVO_BAUDRATE_1M);  // RX: P1.01, TX: P1.02
 
   state.range = RANGE_ACTIVE;
   state.power = POWER_ACTIVE;
@@ -256,29 +261,29 @@ static void idle_disconnect_gpio(void) {
   for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 }
 
-static inline void servo_read_position(const uint8_t id) {
+// static inline void servo_read_position(const uint8_t id) {
 
-  static ServoReadRequest_t request = {
-    .header = { 0xFF, 0xFF },
-    .id = 0,
-    .length = 0x04,
-    .instruction = 0x02,
-    .address = 0x38,
-    .read_length = 0x02,
-    .checksum = 0
-  };
+//   static ServoReadRequest_t request = {
+//     .header = { 0xFF, 0xFF },
+//     .id = 0,
+//     .length = 0x04,
+//     .instruction = 0x02,
+//     .address = 0x38,
+//     .read_length = 0x02,
+//     .checksum = 0
+//   };
 
-  request.id = id;
-  request.checksum = ~(id + 0x40);
+//   request.id = id;
+//   request.checksum = ~(id + 0x40);
 
-  Serial1.write((uint8_t*)&request, sizeof(ServoReadRequest_t));
-  servo_flush_clear();
+//   Serial1.write((uint8_t*)&request, sizeof(ServoReadRequest_t));
+//   servo_flush_clear();
 
-  ServoReadResponse_t response;
-  Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
+//   ServoReadResponse_t response;
+//   Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
 
-  if (response.error == 0) state.position = __builtin_bswap16(response.data);
-}
+//   if (response.header[0] == 0xFF && response.header[1] == 0xFF && response.id == id && response.error == 0) state.position = __builtin_bswap16(response.data);
+// }
 
 static void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed) {
 
@@ -303,20 +308,48 @@ static void servo_write_position(const uint8_t id, const uint16_t position, cons
   servo_flush_clear();
 }
 
-static inline void servo_read_load(const uint8_t id) {
+// static inline void servo_read_load(const uint8_t id) {
+
+//   static ServoReadRequest_t request = {
+//     .header = { 0xFF, 0xFF },
+//     .id = 0,
+//     .length = 0x04,
+//     .instruction = 0x02,
+//     .address = 0x3C,
+//     .read_length = 0x02,
+//     .checksum = 0
+//   };
+
+//   request.id = id;
+//   request.checksum = ~(id + 0x44);
+
+//   Serial1.write((uint8_t*)&request, sizeof(ServoReadRequest_t));
+//   servo_flush_clear();
+
+//   ServoReadResponse_t response;
+//   Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
+
+//   if (response.header[0] == 0xFF && response.header[1] == 0xFF && response.id == id && response.error == 0) {
+//     const uint16_t raw = __builtin_bswap16(response.data) & 0x07FF;
+//     if (raw & (1 << 10)) state.load = -(raw & 0x03FF);
+//     else state.load = (raw & 0x03FF);
+//   }
+// }
+
+static inline void servo_is_moving(const uint8_t id) {
 
   static ServoReadRequest_t request = {
     .header = { 0xFF, 0xFF },
     .id = 0,
     .length = 0x04,
     .instruction = 0x02,
-    .address = 0x3C,
-    .read_length = 0x02,
+    .address = 0x42,
+    .read_length = 0x01,
     .checksum = 0
   };
 
   request.id = id;
-  request.checksum = ~(id + 0x44);
+  request.checksum = ~(id + 0x49);
 
   Serial1.write((uint8_t*)&request, sizeof(ServoReadRequest_t));
   servo_flush_clear();
@@ -324,16 +357,34 @@ static inline void servo_read_load(const uint8_t id) {
   ServoReadResponse_t response;
   Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
 
-  if (response.error == 0) {
-    const uint16_t raw = __builtin_bswap16(response.data) & 0x07FF;
-    if (raw & (1 << 10)) state.load = -(raw & 0x03FF);
-    else state.load = (raw & 0x03FF);
+  if (response.header[0] == 0xFF && response.header[1] == 0xFF && response.id == id && response.error == 0) {
+    state.is_moving = response.data & 0x01;
   }
+}
+
+static void servo_enable_torque(const uint8_t id, const bool enable) {
+
+  static ServoWriteRequest_t request = {
+    .header = { 0xFF, 0xFF },
+    .id = 0,
+    .length = 0x04,
+    .instruction = 0x03,
+    .address = 0x28,
+    .data = 0,
+    .checksum = 0
+  };
+
+  request.id = id;
+  request.data = enable;
+  request.checksum = ~(id + 0x2F + enable);
+
+  Serial1.write((uint8_t*)&request, sizeof(ServoWriteRequest_t));
+  servo_flush_clear();
 }
 
 static void servo_flush_clear(void) {
   Serial1.flush();
   while (Serial1.read() != -1)
     ;
-  delay(10);
+  delay(1);
 }
