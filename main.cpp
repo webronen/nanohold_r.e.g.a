@@ -2,14 +2,6 @@
 
 void setup() {
 
-  idle_disconnect_gpio();
-
-  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                           | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
-
-  NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                            | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
-
   NRF_CLOCK->TASKS_HFCLKSTART = CLOCK_TASKS_HFCLKSTART_TASKS_HFCLKSTART_Trigger;
   while (!NRF_CLOCK->EVENTS_HFCLKSTARTED)
     ;
@@ -17,14 +9,14 @@ void setup() {
   NRF_TIMER0->BITMODE = TIMER_BITMODE_BITMODE_32Bit;
   NRF_TIMER0->PRESCALER = TIMER_PRESCALER_PRESCALER_1MHZ;
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
+
+  idle_power_wakeup();
 }
 
 void loop() {
 
   NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
   state.time_us = NRF_TIMER0->CC[0];
-
-  if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) idle_power_wakeup();
 
   change_mode[state.mode]();
 }
@@ -62,9 +54,12 @@ static inline void mode_manual(void) {
   button_history = ((button_history << 1) | (!!state.buttons));
 
   if (button_history == UINT8_MAX) {
+    state.latch = LATCH_OFF;
     state.step = state.buttons;
     state.idle_us = state.time_us;
   }
+
+  if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) idle_power_wakeup();
 
   execute_step[state.step]();
 }
@@ -83,7 +78,7 @@ static inline void state_down(void) {
     state.latch = LATCH_ON;
   }
 
-  if (!servo_is_moving(SERVO_DEFAULT_ID) && state.latch == LATCH_ON) {
+  if (!servo_is_moving(SERVO_DEFAULT_ID)) {
     delay(1000);
     servo_enable_torque(SERVO_DEFAULT_ID, false);
     NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
@@ -100,14 +95,13 @@ static inline void state_up(void) {
     state.latch = LATCH_ON;
   }
 
-  if (!servo_is_moving(SERVO_DEFAULT_ID) && state.latch == LATCH_ON) {
+  if (!servo_is_moving(SERVO_DEFAULT_ID)) {
     delay(1000);
     servo_enable_torque(SERVO_DEFAULT_ID, false);
     NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
     state.press = PRESS_OPEN;
     state.latch = LATCH_OFF;
     state.step = STEP_IDLE;
-    delay(1000);
   }
 }
 
@@ -124,10 +118,7 @@ static inline void state_reset(void) {
   else if (pressed_us < S_TO_US(5)) (state.blink_us = HZ_TO_US(120));
   else {
 
-    NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                       | (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
-                                       | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
-
+    NRF_P0->OUTCLR = (1UL << LDO_ENABLE_PIN);
     NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
     delay(1000);
@@ -157,22 +148,24 @@ static inline void state_blink(void) {
 
 static inline void idle_power_wakeup(void) {
 
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                     | (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
-                                     | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
-
-  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
+  NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                           | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
+  NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                            | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
 
   NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
-  NRF_P1->OUTCLR = (1UL << SERVO_RX_PULLUP_PIN);
-  delay(1);
   NRF_P1->OUTSET = (1UL << SERVO_RX_PULLUP_PIN);
+
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
+  NRF_P0->OUTSET = (1UL << LDO_ENABLE_PIN);
+
+  NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
 
   Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
-  Serial1.begin(SERVO_BAUDRATE_1M);  // RX: P1.01, TX: P1.02
+  Serial1.begin(SERVO_BAUDRATE_1M);
 
   for (uint8_t i = 0; i < 120; i++) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
@@ -216,26 +209,29 @@ static inline void idle_detect(void) {
 
 static inline void idle_power_save(void) {
 
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                                     | (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
-                                     | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
+  Wire.end();
+  Serial1.end();
 
+  NRF_P0->OUTCLR = (1UL << LDO_ENABLE_PIN);
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-
-  NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
   state.power = POWER_IDLE;
 }
 
 static inline void idle_shutdown(void) {
 
-  idle_disconnect_gpio();
+  for (uint8_t i = 0; i < 32; i++)
+    NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+
+  for (uint8_t i = 0; i < 16; i++)
+    NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                                      | (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
                                      | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
 
   NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                           | (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
                                            | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos)
                                            | (GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos));
 
@@ -244,7 +240,6 @@ static inline void idle_shutdown(void) {
   NRF_CLOCK->TASKS_LFCLKSTOP = CLOCK_TASKS_LFCLKSTOP_TASKS_LFCLKSTOP_Trigger;
 
   __disable_irq();
-
   __DMB();
   __DSB();
   __ISB();
@@ -252,11 +247,6 @@ static inline void idle_shutdown(void) {
   NRF_POWER->SYSTEMOFF = POWER_SYSTEMOFF_SYSTEMOFF_Enter;
   while (true)
     ;
-}
-
-static void idle_disconnect_gpio(void) {
-  for (uint8_t i = 0; i < 32; i++) NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-  for (uint8_t i = 0; i < 16; i++) NRF_P1->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 }
 
 static void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed) {
@@ -295,7 +285,7 @@ static bool servo_is_moving(const uint8_t id) {
   ServoReadResponse_t response;
   Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
 
-  return (response.header[0] == 0xFF && response.header[1] == 0xFF && response.id == id && response.error == 0) ? (response.data & 0x01) : false;
+  return (response.header[0] == 0xFF && response.header[1] == 0xFF && response.id == id && response.length == 2 && response.error == 0) ? (response.data & 0x01) : false;
 }
 
 static void servo_enable_torque(const uint8_t id, const bool enable) {
