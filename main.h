@@ -156,7 +156,7 @@ static SystemState_t state = {
   .mode = MODE_BOOT,
   .step = STEP_UP,
   .buttons = STEP_IDLE,
-  .press = PRESS_CLOSED,
+  .press = PRESS_OPEN,
   .latch = LATCH_OFF,
   .power = POWER_IDLE,
   .range = RANGE_IDLE
@@ -166,7 +166,6 @@ static inline void idle_power_wakeup(void);
 static inline void idle_detect(void);
 static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
-static void idle_disconnect_gpio(void);
 
 static void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed);
 static bool servo_is_moving(const uint8_t id);
