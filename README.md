@@ -5,25 +5,26 @@
 #### 🟢 Automatic Mode
 The system performs complete open-close cycles with sensor-based triggering:
 1. **Object Detection** – VL53L4CD sensor detects object presence with 8-sample debounce
-2. **Closing Phase** – Servo presses down until stall detection (Red LED illuminated)
-3. **Opening Phase** – Servo retracts to up position after 5 second hold (Green LED illuminated)
+2. **Closing Phase** – Servo presses down until stall detection, then holds for 5 seconds (Red LED illuminated)
+3. **Opening Phase** – Servo retracts to up position (Green LED illuminated)
 4. **Completion** – Returns to idle state, ready for next detection
 
 #### 👤 Manual Mode (Button Control)
 User intervention takes priority with instant response:
 - **Direct Control**: Left button (UP), Right button (DOWN)
 - **8-Sample Debounce**: Prevents false triggers from noise
-- **Emergency Stop**: Any button press during movement immediately halts operation
 - **Single Action**: Each button press completes one movement before stopping
 
 ### Visual Indicators
 
-| State | LED | Description |
-|-------|-----|-------------|
-| Opening | 🟢 Green Solid | Actively moving upward |
-| Closing | 🔴 Red Solid | Actively pressing downward |
-| Reset | ⚡ Fast Blink | Both buttons held 4-5 seconds |
+| State | LED State | Description |
+|-------|-----------|-------------|
+| Opening | 🟢 Green | Actively moving upward |
+| Closing | 🔴 Red | Actively pressing downward |
+| Reset | ⚡ Amber Blink | Both buttons held 4-5 seconds |
 | Idle | ⚫ Off | System idle or powered down |
+
+*Bi-color LED with tri-state control using series configuration (anode of one LED connected to cathode of the other)*
 
 ### Power Management
 
@@ -49,7 +50,7 @@ User intervention takes priority with instant response:
 | **Servo** | Serial bus servo with position feedback |
 | **Sensor** | VL53L4CD Time-of-Flight |
 | **Power** | LDO-controlled, minimal idle consumption |
-| **Indicators** | Bi-color LED (Red/Green) |
+| **LED** | Bi-color, series-connected with tri-state control |
 
 ### 3D Model
 [NANOHOLD R.E.G.A on MakerWorld](https://makerworld.com/en/models/2253633-nanohold-r-e-g-a)
