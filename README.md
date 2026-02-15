@@ -1,35 +1,59 @@
 # NANOHOLD R.E.G.A | Robotic Enhanced Grip Assistant
 
-## Operating Modes
+### Operating Modes
 
-### 🟢 Automatic Mode (Default)
-The system automatically performs complete open-close cycles when ready:
-1. **Opening Phase** – Moves upward until reaching target position (Green LED illuminated)
-2. **Closing Phase** – Presses downward until detecting sufficient force (Red LED illuminated)
-3. **Completion** – Returns to idle state after successful cycle
+#### 🟢 Automatic Mode
+The system performs complete open-close cycles with sensor-based triggering:
+1. **Object Detection** – VL53L4CD sensor detects object presence with 8-sample debounce
+2. **Closing Phase** – Servo presses down until stall detection (Red LED illuminated)
+3. **Opening Phase** – Servo retracts to up position after 5 second hold (Green LED illuminated)
+4. **Completion** – Returns to idle state, ready for next detection
 
-### 👤 Manual Mode (Button Override)
-User intervention immediately takes priority:
-- **Activation**: Any button press instantly switches control to manual
-- **Direct Control**: Buttons command specific movements directly
-- **Single Action**: System completes only the requested operation before stopping
+#### 👤 Manual Mode (Button Control)
+User intervention takes priority with instant response:
+- **Direct Control**: Left button (UP), Right button (DOWN)
+- **8-Sample Debounce**: Prevents false triggers from noise
+- **Emergency Stop**: Any button press during movement immediately halts operation
+- **Single Action**: Each button press completes one movement before stopping
 
-## Visual Indicators
-- **Solid Green LED**: Actively opening/moving upward
-- **Solid Red LED**: Actively closing/pressing downward  
-- **Fast Blinking LED**: Reset sequence active (both buttons held)
-- **No LED**: System idle or power disabled
+### Visual Indicators
 
-## Safety & Protection Features
-- **Emergency Reset**: Hold both buttons for 5 seconds to trigger system reboot
-- **Power Management**: Power automatically disable after 5 minute of inactivity
-- **Command Protection**: Prevents duplicate movement commands with latch mechanism
-- **Force Limiting**: Stops downward motion when predetermined pressure threshold reached
+| State | LED | Description |
+|-------|-----|-------------|
+| Opening | 🟢 Green Solid | Actively moving upward |
+| Closing | 🔴 Red Solid | Actively pressing downward |
+| Reset | ⚡ Fast Blink | Both buttons held 4-5 seconds |
+| Idle | ⚫ Off | System idle or powered down |
 
-## Behavioral Notes
-- Manual control always overrides automatic operation
-- Each mode completes its current action before transitioning states
-- System maintains last known position/force state between operations
+### Power Management
 
-## 3D Model
-- [NANOHOLD R.E.G.A](https://makerworld.com/en/models/2253633-nanohold-r-e-g-a)
+| Mode | Timeout | Description |
+|------|---------|-------------|
+| **Active** | – | Normal operation, all systems enabled |
+| **Power Save** | 1 min idle | LDO disabled, LED off, wake on button |
+| **Shutdown** | 5 min idle | Full SYSTEMOFF with button wake |
+
+### Safety & Protection
+
+- **Emergency Reset**: Hold both buttons 5+ seconds for system reboot
+- **Stall Detection**: Servo stops automatically at mechanical limit
+- **Torque Disable**: Motor disabled after movement completion
+- **Debounced Inputs**: 8-sample history for reliable button detection
+- **Latch Mechanism**: Prevents duplicate command transmission
+
+### Technical Specifications
+
+| Component | Specification |
+|-----------|---------------|
+| **Microcontroller** | nRF52840 |
+| **Servo** | Serial bus servo with position feedback |
+| **Sensor** | VL53L4CD Time-of-Flight |
+| **Power** | LDO-controlled, minimal idle consumption |
+| **Indicators** | Bi-color LED (Red/Green) |
+
+### 3D Model
+[NANOHOLD R.E.G.A on MakerWorld](https://makerworld.com/en/models/2253633-nanohold-r-e-g-a)
+
+---
+
+*Robotic Enhanced Grip Assistant – Smart Press Control*
