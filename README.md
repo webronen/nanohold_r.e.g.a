@@ -46,9 +46,9 @@ User intervention takes priority with instant response:
 
 | Component | Specification |
 |-----------|---------------|
-| **Microcontroller** | nRF52840 |
-| **Servo** | Serial bus servo with position feedback |
-| **Sensor** | VL53L4CD Time-of-Flight |
+| **Microcontroller** | Supermini nRF52840 |
+| **Servo** | Feetech SCS0009 Serial bus servo with position feedback |
+| **Sensor** | SATEL-VL53L4CD Time-of-Flight |
 | **Power** | LDO-controlled, minimal idle consumption |
 | **LED** | Bi-color, series-connected with tri-state control |
 
