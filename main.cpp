@@ -33,10 +33,7 @@ static inline void mode_boot(void) {
 
 static inline void mode_auto(void) {
 
-  if (state.press == PRESS_OPEN) (state.step = STEP_DOWN);
-  else (state.step = STEP_UP);
-
-  execute_step[state.step]();
+  execute_step[state.press == PRESS_OPEN ? STEP_DOWN : STEP_UP]();
 
   if (state.press == PRESS_CLOSED) {
     state.mode = MODE_MANUAL;
@@ -51,6 +48,8 @@ static inline void mode_manual(void) {
   state.buttons = (StepState_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON_PIN))) << 1)
                                 | ((!(NRF_P0->IN & (1 << GPIO_RIGHT_BUTTON_PIN))) << 0));
 
+  if ((state.power == POWER_IDLE) && state.buttons) idle_power_wakeup();
+
   button_history = ((button_history << 1) | (!!state.buttons));
 
   if (button_history == UINT8_MAX) {
@@ -59,15 +58,13 @@ static inline void mode_manual(void) {
     state.idle_us = state.time_us;
   }
 
-  if ((state.step != STEP_IDLE) && (state.power == POWER_IDLE)) idle_power_wakeup();
-
   execute_step[state.step]();
 }
 
 static inline void state_idle(void) {
   const int32_t idle_us = (state.time_us - state.idle_us);
   if (idle_us >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
-  else if (idle_us >= POWER_SAVE_TIMEOUT_M) idle_power_save();
+  else if ((idle_us >= POWER_SAVE_TIMEOUT_M) && (state.power == POWER_ACTIVE)) idle_power_save();
   else if ((state.power == POWER_ACTIVE) && (state.press == PRESS_OPEN)) idle_detect();
 }
 
@@ -76,9 +73,7 @@ static inline void state_down(void) {
   if (state.latch == LATCH_OFF) {
     servo_write_position(SERVO_DEFAULT_ID, SERVO_DOWN_POSITION, SERVO_DOWN_SPEED);
     state.latch = LATCH_ON;
-  }
-
-  if (!servo_is_moving(SERVO_DEFAULT_ID)) {
+  } else if (!servo_is_moving(SERVO_DEFAULT_ID)) {
     delay(1000);
     servo_enable_torque(SERVO_DEFAULT_ID, false);
     NRF_P0->OUTCLR = (1 << GPIO_STATUS_PIN);
@@ -93,9 +88,7 @@ static inline void state_up(void) {
   if (state.latch == LATCH_OFF) {
     servo_write_position(SERVO_DEFAULT_ID, SERVO_UP_POSITION, SERVO_UP_SPEED);
     state.latch = LATCH_ON;
-  }
-
-  if (!servo_is_moving(SERVO_DEFAULT_ID)) {
+  } else if (!servo_is_moving(SERVO_DEFAULT_ID)) {
     delay(1000);
     servo_enable_torque(SERVO_DEFAULT_ID, false);
     NRF_P0->OUTSET = (1 << GPIO_STATUS_PIN);
@@ -149,17 +142,25 @@ static inline void state_blink(void) {
 static inline void idle_power_wakeup(void) {
 
   NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                           | (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
                                            | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
+
   NRF_P0->PIN_CNF[GPIO_RIGHT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                            | (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
                                             | (GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos));
+
+  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
+  NRF_P0->OUTSET = (1UL << LDO_ENABLE_PIN);
+  delay(10);
 
   NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
   NRF_P1->OUTSET = (1UL << SERVO_RX_PULLUP_PIN);
 
-  NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
-  NRF_P0->OUTSET = (1UL << LDO_ENABLE_PIN);
-
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
+
+  NRF_P0->PIN_CNF[GPIO_MONITOR_PIN] = ((GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos)
+                                       | (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos));
+  NRF_P0->OUTCLR = (1UL << GPIO_MONITOR_PIN);
 
   Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
   Wire.begin();
@@ -212,8 +213,10 @@ static inline void idle_power_save(void) {
   Wire.end();
   Serial1.end();
 
+  NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
   NRF_P0->OUTCLR = (1UL << LDO_ENABLE_PIN);
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+  NRF_P0->PIN_CNF[GPIO_MONITOR_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
 
   state.power = POWER_IDLE;
 }
@@ -245,6 +248,7 @@ static inline void idle_shutdown(void) {
   __ISB();
 
   NRF_POWER->SYSTEMOFF = POWER_SYSTEMOFF_SYSTEMOFF_Enter;
+
   while (true)
     ;
 }
