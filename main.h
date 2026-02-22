@@ -19,6 +19,7 @@
 #define I2C_CLK_PIN 36            // P1.04
 #define I2C_SDA_PIN 38            // P1.06
 #define GPIO_STATUS_PIN 11        // P0.11
+#define GPIO_MONITOR_PIN 22       // P0.22
 #define GPIO_RIGHT_BUTTON_PIN 24  // P0.24
 #define GPIO_LEFT_BUTTON_PIN 0    // P1.00
 
@@ -156,10 +157,10 @@ static SystemState_t state = {
   .mode = MODE_BOOT,
   .step = STEP_UP,
   .buttons = STEP_IDLE,
-  .press = PRESS_OPEN,
+  .press = PRESS_CLOSED,
   .latch = LATCH_OFF,
-  .power = POWER_IDLE,
-  .range = RANGE_IDLE
+  .power = POWER_ACTIVE,
+  .range = RANGE_ACTIVE
 };
 
 static inline void idle_power_wakeup(void);
