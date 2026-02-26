@@ -160,7 +160,7 @@ static inline void idle_power_wakeup(void) {
 
   NRF_P0->PIN_CNF[GPIO_MONITOR_PIN] = ((GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos)
                                        | (GPIO_PIN_CNF_DRIVE_H0H1 << GPIO_PIN_CNF_DRIVE_Pos));
-  NRF_P0->OUTCLR = (1UL << GPIO_MONITOR_PIN);
+  NRF_P0->OUTSET = (1UL << GPIO_MONITOR_PIN);
 
   Wire.setPins(I2C_SDA_PIN, I2C_CLK_PIN);
   Wire.begin();
@@ -216,7 +216,7 @@ static inline void idle_power_save(void) {
   NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
   NRF_P0->OUTCLR = (1UL << LDO_ENABLE_PIN);
   NRF_P0->PIN_CNF[GPIO_STATUS_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
-  NRF_P0->PIN_CNF[GPIO_MONITOR_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
+  NRF_P0->OUTCLR = (1UL << GPIO_MONITOR_PIN);
 
   state.power = POWER_IDLE;
 }
@@ -232,6 +232,10 @@ static inline void idle_shutdown(void) {
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                                      | (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
                                      | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
+
+  NRF_P0->PIN_CNF[GPIO_MONITOR_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                                       | (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos)
+                                       | (GPIO_PIN_CNF_PULL_Pulldown << GPIO_PIN_CNF_PULL_Pos));
 
   NRF_P1->PIN_CNF[GPIO_LEFT_BUTTON_PIN] = ((GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                                            | (GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
