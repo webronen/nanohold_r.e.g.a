@@ -27,7 +27,8 @@
 #define SERVO_BAUDRATE_1M 1000000
 #define I2C_FREQUENCY_400K 400000
 
-#define SENSOR_DISTANCE_MM 30
+#define RANGE_STATUS_VALID 9
+#define AUTO_DISTANCE_MM 30
 
 #define SERVO_DEFAULT_ID 1
 #define SERVO_UP_POSITION 80
@@ -168,9 +169,13 @@ static inline void idle_detect(void);
 static inline void idle_power_save(void);
 static inline void idle_shutdown(void);
 
-static void servo_write_position(const uint8_t id, const uint16_t position, const uint16_t speed);
-static bool servo_is_moving(const uint8_t id);
-static void servo_enable_torque(const uint8_t id, const bool enable);
+static void servo_target_position(const uint8_t id, const uint16_t position, const uint16_t speed);
+static bool servo_move_flag(const uint8_t id);
+// static void servo_torque_switch(const uint8_t id, const bool enable);
+// static void servo_lock_eeprom(const uint8_t id, const bool lock);
+// static void servo_overload_torque(const uint8_t id, const uint8_t torque);
+// static void servo_protection_time(const uint8_t id, const uint8_t time);
+// static void servo_protection_torque(const uint8_t id, const uint8_t torque);
 static void servo_flush_clear(void);
 
 #endif  // MAIN_H
