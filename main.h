@@ -24,11 +24,13 @@
 #define GPIO_LEFT_BUTTON_PIN 0    // P1.00
 
 #define TIMER_PRESCALER_PRESCALER_1MHZ 4  // (1us Tick)
+#define SERIAL_BAUDRATE 115200
 #define SERVO_BAUDRATE_1M 1000000
 #define I2C_FREQUENCY_400K 400000
 
 #define RANGE_STATUS_VALID 9
-#define AUTO_DISTANCE_MM 30
+#define AUTO_DISTANCE_MM 35
+#define DISTANCE_MM_LPF 0.75f
 
 #define SERVO_DEFAULT_ID 1
 #define SERVO_UP_POSITION 80
@@ -145,6 +147,7 @@ typedef struct __attribute__((packed)) SystemState {
   uint32_t time_us;
   uint32_t idle_us;
   uint32_t blink_us;
+  uint16_t distance_mm;
   StepMode_t mode;
   StepState_t step;
   StepState_t buttons;
@@ -158,6 +161,7 @@ static SystemState_t state = {
   .time_us = 0,
   .idle_us = 0,
   .blink_us = 0,
+  .distance_mm = 0,
   .mode = MODE_BOOT,
   .step = STEP_UP,
   .buttons = STEP_IDLE,
