@@ -48,11 +48,10 @@ static inline void mode_manual(void) {
   state.buttons = (StepState_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON_PIN))) << 1)
                                 | ((!(NRF_P0->IN & (1 << GPIO_RIGHT_BUTTON_PIN))) << 0));
 
-  if ((state.power == POWER_IDLE) && state.buttons) idle_power_wakeup();
-
   button_history = ((button_history << 1) | (!!state.buttons));
 
   if (button_history == UINT8_MAX) {
+    if (state.power == POWER_IDLE) idle_power_wakeup();
     state.step = state.buttons;
     state.idle_us = state.time_us;
   }
