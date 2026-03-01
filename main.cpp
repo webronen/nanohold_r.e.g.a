@@ -163,6 +163,7 @@ static inline void idle_power_wakeup(void) {
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
+  Serial.begin(SERIAL_BAUDRATE);
   Serial1.begin(SERVO_BAUDRATE_1M);
 
   for (uint8_t i = 0; i < 120; i++) {
@@ -199,13 +200,22 @@ static inline void idle_detect(void) {
     sensor.VL53L4CD_GetRawResult(&raw_result);
     sensor.VL53L4CD_ClearInterrupt();
 
-    const bool object_detected = ((raw_result.range_status == RANGE_STATUS_VALID) && (__builtin_bswap16(raw_result.distance) < AUTO_DISTANCE_MM));
-    detect_history = ((detect_history << 1) | (!!object_detected));
+    if (raw_result.range_status == RANGE_STATUS_VALID) {
 
-    if (detect_history == UINT8_MAX) {
-      sensor.VL53L4CD_ClearInterruptAndStopRanging();
-      state.range = RANGE_IDLE;
-      state.mode = MODE_AUTO;
+      uint16_t raw_distance_mm = __builtin_bswap16(raw_result.distance);
+      state.distance_mm += (raw_distance_mm - state.distance_mm) * DISTANCE_MM_LPF;
+
+      printf("Distance: %u mm\r\n", state.distance_mm);
+
+      detect_history = (detect_history << 1) | (state.distance_mm < AUTO_DISTANCE_MM);
+
+      if (detect_history == UINT8_MAX) {
+        sensor.VL53L4CD_ClearInterruptAndStopRanging();
+        state.range = RANGE_IDLE;
+        state.mode = MODE_AUTO;
+        detect_history = 0;
+      }
+    } else {
       detect_history = 0;
     }
   }
@@ -214,6 +224,7 @@ static inline void idle_detect(void) {
 static inline void idle_power_save(void) {
 
   Wire.end();
+  Serial.end();
   Serial1.end();
 
   NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
