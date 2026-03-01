@@ -53,7 +53,6 @@ static inline void mode_manual(void) {
   button_history = ((button_history << 1) | (!!state.buttons));
 
   if (button_history == UINT8_MAX) {
-    state.latch = LATCH_OFF;
     state.step = state.buttons;
     state.idle_us = state.time_us;
   }
@@ -62,12 +61,14 @@ static inline void mode_manual(void) {
 }
 
 static inline void state_idle(void) {
+
   const int32_t idle_us = (state.time_us - state.idle_us);
-  if ((state.power == POWER_ACTIVE) && (state.press == PRESS_OPEN)) {
-    if (idle_us >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
-    else if (idle_us >= POWER_SAVE_TIMEOUT_M) idle_power_save();
+
+  if (state.press == PRESS_CLOSED) state.idle_us = state.time_us;
+  else if (state.power == POWER_ACTIVE) {
+    if (idle_us >= POWER_SAVE_TIMEOUT_M) idle_power_save();
     else idle_detect();
-  }
+  } else if (state.power == POWER_IDLE && idle_us >= SHUTDOWN_TIMEOUT_M) idle_shutdown();
 }
 
 static inline void state_down(void) {
@@ -149,7 +150,6 @@ static inline void idle_power_wakeup(void) {
 
   NRF_P0->PIN_CNF[LDO_ENABLE_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
   NRF_P0->OUTSET = (1UL << LDO_ENABLE_PIN);
-  delay(10);
 
   NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_DIR_Output << GPIO_PIN_CNF_DIR_Pos);
   NRF_P1->OUTSET = (1UL << SERVO_RX_PULLUP_PIN);
@@ -175,9 +175,9 @@ static inline void idle_power_wakeup(void) {
   sensor.VL53L4CD_StartRanging();
 
   // servo_lock_eeprom(SERVO_DEFAULT_ID, false);
-  // servo_overload_torque(SERVO_DEFAULT_ID, 10);   // 0 - 100%
-  // servo_protection_time(SERVO_DEFAULT_ID, 25);   // 25 * 40ms = 1s (max. 10s)
-  // servo_protection_torque(SERVO_DEFAULT_ID, 1);  // 0 - 100%
+  // servo_overload_torque(SERVO_DEFAULT_ID, SERVO_OVERLOAD_TORQUE);
+  // servo_protection_time(SERVO_DEFAULT_ID, SERVO_PROTECTION_TIME);
+  // servo_protection_torque(SERVO_DEFAULT_ID, SERVO_PROTECTION_TORQUE);
   // servo_lock_eeprom(SERVO_DEFAULT_ID, true);
 
   state.range = RANGE_ACTIVE;
