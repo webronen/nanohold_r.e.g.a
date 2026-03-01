@@ -35,6 +35,9 @@
 #define SERVO_DOWN_POSITION 300
 #define SERVO_UP_SPEED 150
 #define SERVO_DOWN_SPEED 150
+#define SERVO_OVERLOAD_TORQUE 10   // 0 - 100%
+#define SERVO_PROTECTION_TIME 25   // 25 * 40ms = 1s (max. 10s)
+#define SERVO_PROTECTION_TORQUE 1  // 0 - 100%
 
 VL53L4CD sensor(&Wire, -1);
 
