@@ -19,6 +19,19 @@ void loop() {
   state.time_us = NRF_TIMER0->CC[0];
 
   change_mode[state.mode]();
+
+  printf(JSON_STATE_TEMPLATE,
+         state.time_us,
+         state.idle_us,
+         state.blink_us,
+         state.distance_mm,
+         state.mode,
+         state.step,
+         state.buttons,
+         state.press,
+         state.latch,
+         state.power,
+         state.range);
 }
 
 static inline void mode_boot(void) {
@@ -163,8 +176,8 @@ static inline void idle_power_wakeup(void) {
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
-  Serial.begin(SERIAL_BAUDRATE);
-  Serial1.begin(SERVO_BAUDRATE_1M);
+  Serial.begin(SERIAL_BAUDRATE_1M);
+  Serial1.begin(SERIAL_BAUDRATE_1M);
 
   for (uint8_t i = 0; i < 120; i++) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
@@ -224,7 +237,6 @@ static inline void idle_detect(void) {
 static inline void idle_power_save(void) {
 
   Wire.end();
-  Serial.end();
   Serial1.end();
 
   NRF_P1->PIN_CNF[SERVO_RX_PULLUP_PIN] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
@@ -236,6 +248,8 @@ static inline void idle_power_save(void) {
 }
 
 static inline void idle_shutdown(void) {
+
+  Serial.end();
 
   for (uint8_t i = 0; i < 32; i++)
     NRF_P0->PIN_CNF[i] = (GPIO_PIN_CNF_INPUT_Disconnect << GPIO_PIN_CNF_INPUT_Pos);
