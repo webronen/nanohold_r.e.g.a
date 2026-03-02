@@ -9,6 +9,7 @@
 #define HZ_TO_US(hz) (1000000UL / (hz))
 #define M_TO_US(m) ((m)*60 * 1000000UL)
 #define S_TO_US(s) ((s)*1000000UL)
+#define JSON_STATE_TEMPLATE "{\"time_us\":%lu,\"idle_us\":%lu,\"blink_us\":%lu,\"distance_mm\":%u,\"mode\":%d,\"step\":%d,\"buttons\":%d,\"press\":%d,\"latch\":%d,\"power\":%d,\"range\":%d}\r\n"
 
 #define POWER_SAVE_TIMEOUT_M M_TO_US(1)
 #define SHUTDOWN_TIMEOUT_M M_TO_US(5)
@@ -24,8 +25,7 @@
 #define GPIO_LEFT_BUTTON_PIN 0    // P1.00
 
 #define TIMER_PRESCALER_PRESCALER_1MHZ 4  // (1us Tick)
-#define SERIAL_BAUDRATE 115200
-#define SERVO_BAUDRATE_1M 1000000
+#define SERIAL_BAUDRATE_1M 1000000
 #define I2C_FREQUENCY_400K 400000
 
 #define RANGE_STATUS_VALID 9
