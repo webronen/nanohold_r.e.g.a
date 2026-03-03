@@ -17,7 +17,7 @@ User intervention takes priority with instant response:
 
 ### Serial Remote Control
 
-Control the system via serial terminal (115200 baud):
+Control the system via serial terminal (1M baud):
 
 | Command | Action |
 |---------|--------|
