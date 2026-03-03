@@ -9,7 +9,7 @@
 #define HZ_TO_US(hz) (1000000UL / (hz))
 #define M_TO_US(m) ((m)*60 * 1000000UL)
 #define S_TO_US(s) ((s)*1000000UL)
-#define JSON_STATE_TEMPLATE "{\"time_us\":%lu,\"idle_us\":%lu,\"blink_us\":%lu,\"distance_mm\":%u,\"mode\":%d,\"step\":%d,\"buttons\":%d,\"press\":%d,\"latch\":%d,\"power\":%d,\"range\":%d}\r\n"
+#define JSON_RESPONSE_TEMPLATE "{\"time_us\":%lu,\"idle_us\":%lu,\"blink_us\":%lu,\"distance_mm\":%u,\"mode\":%d,\"step\":%d,\"buttons\":%d,\"press\":%d,\"latch\":%d,\"power\":%d,\"range\":%d}\r\n"
 
 #define POWER_SAVE_TIMEOUT_M M_TO_US(1)
 #define SHUTDOWN_TIMEOUT_M M_TO_US(5)
@@ -102,25 +102,24 @@ static const StepSelect_t execute_step[] = {
   [STEP_RESET] = state_reset,
 };
 
-typedef struct __attribute__((packed)) ServoReadRequest {
-  uint8_t header[2];
-  uint8_t id;
-  uint8_t length;
-  uint8_t instruction;
-  uint8_t address;
-  uint8_t read_length;
-  uint8_t checksum;
-} ServoReadRequest_t;
+typedef struct __attribute__((packed)) ServoRequest {
+  uint8_t header[2];    // 0xFF, 0xFF
+  uint8_t id;           // Servo ID (0xFE for broadcast)
+  uint8_t length;       // 0x04 for single byte operations
+  uint8_t instruction;  // 0x02=read, 0x03=write, 0x06=sync write
+  uint8_t address;      // Register address (e.g., 0x24 for LED, 0x2A for position)
+  uint8_t data;         // For read: number of bytes to read, for write: value to write
+  uint8_t checksum;     // ~(id + length + instruction + address + data)
+} ServoRequest_t;
 
-typedef struct __attribute__((packed)) ServoWriteRequest {
+typedef struct __attribute__((packed)) ServoResponse {
   uint8_t header[2];
   uint8_t id;
   uint8_t length;
-  uint8_t instruction;
-  uint8_t address;
-  uint8_t data;
+  uint8_t error;
+  uint16_t data;
   uint8_t checksum;
-} ServoWriteRequest_t;
+} ServoResponse_t;
 
 typedef struct __attribute__((packed)) ServoWritePosition {
   uint8_t header[2];
@@ -133,15 +132,6 @@ typedef struct __attribute__((packed)) ServoWritePosition {
   uint16_t speed;
   uint8_t checksum;
 } ServoWritePosition_t;
-
-typedef struct __attribute__((packed)) ServoReadResponse {
-  uint8_t header[2];
-  uint8_t id;
-  uint8_t length;
-  uint8_t error;
-  uint16_t data;
-  uint8_t checksum;
-} ServoReadResponse_t;
 
 typedef struct __attribute__((packed)) SystemState {
   uint32_t time_us;
@@ -178,11 +168,8 @@ static inline void idle_shutdown(void);
 
 static void servo_target_position(const uint8_t id, const uint16_t position, const uint16_t speed);
 static bool servo_move_flag(const uint8_t id);
-// static void servo_torque_switch(const uint8_t id, const bool enable);
-// static void servo_lock_eeprom(const uint8_t id, const bool lock);
-// static void servo_overload_torque(const uint8_t id, const uint8_t torque);
-// static void servo_protection_time(const uint8_t id, const uint8_t time);
-// static void servo_protection_torque(const uint8_t id, const uint8_t torque);
 static void servo_flush_clear(void);
+
+static inline void handle_serial_commands(void);
 
 #endif  // MAIN_H
