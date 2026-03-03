@@ -21,8 +21,8 @@ Control the system via serial terminal (1M baud):
 
 | Command | Action |
 |---------|--------|
-| `+` | Move UP one step |
-| `-` | Move DOWN one step |
+| `+` | Open press |
+| `-` | Close press |
 | `r` | Trigger system reset |
 | `s` | Print JSON state |
 | `?` | Show help menu |
