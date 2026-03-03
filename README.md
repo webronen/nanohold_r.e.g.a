@@ -5,8 +5,8 @@
 #### 🟢 Automatic Mode
 The system performs complete open-close cycles with sensor-based triggering:
 1. **Object Detection** – VL53L4CD sensor detects object presence with 8-sample debounce
-2. **Closing Phase** – Servo presses down until stall detection, holds for 1 second, then disables torque (Red LED)
-3. **Opening Phase** – Servo retracts to up position and disables torque (Green LED)
+2. **Closing Phase** – Servo presses down until stall detection, holds for 1 second, then disables torque (🔴 Red LED)
+3. **Opening Phase** – Servo retracts to up position and disables torque (🟢 Green LED)
 4. **Completion** – Returns to idle state, ready for next detection
 
 #### 👤 Manual Mode (Button Control)
@@ -14,6 +14,21 @@ User intervention takes priority with instant response:
 - **Direct Control**: Left button (UP), Right button (DOWN)
 - **8-Sample Debounce**: Prevents false triggers from noise
 - **Single Action**: Each button press completes one movement before stopping
+
+### Serial Remote Control
+
+Control the system via serial terminal (115200 baud):
+
+| Command | Action |
+|---------|--------|
+| `+` | Move UP one step |
+| `-` | Move DOWN one step |
+| `r` | Trigger system reset |
+| `s` | Print JSON state |
+| `?` | Show help menu |
+
+**JSON Response:**
+{"mode":1,"step":2,"power":1,"distance_mm":150,"time_us":12345678}
 
 ### Visual Indicators
 
@@ -41,6 +56,7 @@ User intervention takes priority with instant response:
 - **Torque Disable**: Motor disabled 1 second after stall or movement completion
 - **Debounced Inputs**: 8-sample history for reliable button detection
 - **Latch Mechanism**: Prevents duplicate command transmission
+- **Remote Commands**: Direct control via serial interface
 
 ### Technical Specifications
 
@@ -58,4 +74,4 @@ User intervention takes priority with instant response:
 
 ---
 
-*Robotic Enhanced Grip Assistant – Smart Press Control*
+*Robotic Enhanced Grip Assistant – Smart Press Control with Serial Remote*
