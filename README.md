@@ -5,7 +5,7 @@
 #### 🟢 Automatic Mode
 The system performs complete open-close cycles with sensor-based triggering:
 1. **Object Detection** – VL53L4CD sensor detects object presence with 8-sample debounce
-2. **Closing Phase** – Drive to stall at 10% max torque, hold for 1 second, then reduce to 1% holding torque (🔴 Red LED)
+2. **Closing Phase** – Drive to stall at 10% torque, hold 1s, then reduce to 1% hold (🔴 Red LED)
 3. **Opening Phase** – Servo retracts to up position and disables torque (🟢 Green LED)
 4. **Completion** – Returns to idle state, ready for next detection
 
