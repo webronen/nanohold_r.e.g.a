@@ -10,6 +10,8 @@ void setup() {
   NRF_TIMER0->PRESCALER = TIMER_PRESCALER_PRESCALER_1MHZ;
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
 
+  Serial.begin(SERIAL_BAUDRATE_1M);
+
   idle_power_wakeup();
 }
 
@@ -18,20 +20,24 @@ void loop() {
   NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
   state.time_us = NRF_TIMER0->CC[0];
 
+  handle_serial_commands();
   change_mode[state.mode]();
+}
 
-  printf(JSON_STATE_TEMPLATE,
-         state.time_us,
-         state.idle_us,
-         state.blink_us,
-         state.distance_mm,
-         state.mode,
-         state.step,
-         state.buttons,
-         state.press,
-         state.latch,
-         state.power,
-         state.range);
+static inline void handle_serial_commands(void) {
+  if (Serial.peek() != -1) {
+    switch (Serial.read()) {
+      case '+': state.step = STEP_UP; break;
+      case '-': state.step = STEP_DOWN; break;
+      case 'r': state.buttons = STEP_RESET; break;
+      case 's':
+        printf(JSON_RESPONSE_TEMPLATE, state.time_us, state.idle_us, state.blink_us,
+               state.distance_mm, state.mode, state.step, state.buttons, state.press,
+               state.latch, state.power, state.range);
+        break;
+      case '?': Serial.println("+=up, -=down, r=reset, s=state");
+    }
+  }
 }
 
 static inline void mode_boot(void) {
@@ -58,8 +64,10 @@ static inline void mode_manual(void) {
 
   static uint8_t button_history = 0;
 
-  state.buttons = (StepState_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON_PIN))) << 1)
-                                | ((!(NRF_P0->IN & (1 << GPIO_RIGHT_BUTTON_PIN))) << 0));
+  if (state.buttons != STEP_RESET) {
+    state.buttons = (StepState_t)(((!(NRF_P1->IN & (1 << GPIO_LEFT_BUTTON_PIN))) << 1)
+                                  | ((!(NRF_P0->IN & (1 << GPIO_RIGHT_BUTTON_PIN))) << 0));
+  }
 
   button_history = ((button_history << 1) | (!!state.buttons));
 
@@ -176,7 +184,6 @@ static inline void idle_power_wakeup(void) {
   Wire.begin();
   Wire.setClock(I2C_FREQUENCY_400K);
 
-  Serial.begin(SERIAL_BAUDRATE_1M);
   Serial1.begin(SERIAL_BAUDRATE_1M);
 
   for (uint8_t i = 0; i < 120; i++) {
@@ -186,12 +193,6 @@ static inline void idle_power_wakeup(void) {
 
   sensor.VL53L4CD_SensorInit();
   sensor.VL53L4CD_StartRanging();
-
-  // servo_lock_eeprom(SERVO_DEFAULT_ID, false);
-  // servo_overload_torque(SERVO_DEFAULT_ID, SERVO_OVERLOAD_TORQUE);
-  // servo_protection_time(SERVO_DEFAULT_ID, SERVO_PROTECTION_TIME);
-  // servo_protection_torque(SERVO_DEFAULT_ID, SERVO_PROTECTION_TORQUE);
-  // servo_lock_eeprom(SERVO_DEFAULT_ID, true);
 
   state.range = RANGE_ACTIVE;
   state.power = POWER_ACTIVE;
@@ -215,10 +216,8 @@ static inline void idle_detect(void) {
 
     if (raw_result.range_status == RANGE_STATUS_VALID) {
 
-      uint16_t raw_distance_mm = __builtin_bswap16(raw_result.distance);
+      const uint16_t raw_distance_mm = __builtin_bswap16(raw_result.distance);
       state.distance_mm += (raw_distance_mm - state.distance_mm) * DISTANCE_MM_LPF;
-
-      printf("Distance: %u mm\r\n", state.distance_mm);
 
       detect_history = (detect_history << 1) | (state.distance_mm < AUTO_DISTANCE_MM);
 
@@ -306,105 +305,24 @@ static void servo_target_position(const uint8_t id, const uint16_t position, con
 
 static bool servo_move_flag(const uint8_t id) {
 
-  ServoReadRequest_t request = {
+  ServoRequest_t request = {
     .header = { 0xFF, 0xFF },
     .id = id,
     .length = 0x04,
     .instruction = 0x02,
     .address = 0x42,
-    .read_length = 0x01,
+    .data = 0x01,
     .checksum = ~(id + 0x49)
   };
 
-  Serial1.write((uint8_t*)&request, sizeof(ServoReadRequest_t));
+  Serial1.write((uint8_t*)&request, sizeof(ServoRequest_t));
   servo_flush_clear();
 
-  ServoReadResponse_t response;
-  Serial1.readBytes((uint8_t*)&response, sizeof(ServoReadResponse_t));
+  ServoResponse_t response;
+  Serial1.readBytes((uint8_t*)&response, sizeof(ServoResponse_t));
 
-  return (response.header[0] == 0xFF && response.header[1] == 0xFF && response.id == id && response.length == 2 && response.error == 0) ? (response.data & 0x01) : false;
+  return (!response.error) && (response.data & 0x01);
 }
-
-// static void servo_torque_switch(const uint8_t id, const bool enable) {
-
-//   ServoWriteRequest_t request = {
-//     .header = { 0xFF, 0xFF },
-//     .id = id,
-//     .length = 0x04,
-//     .instruction = 0x03,
-//     .address = 0x28,
-//     .data = enable,
-//     .checksum = ~(id + 0x2F + enable)
-//   };
-
-//   Serial1.write((uint8_t*)&request, sizeof(ServoWriteRequest_t));
-//   servo_flush_clear();
-// }
-
-// static void servo_lock_eeprom(const uint8_t id, const bool lock) {
-
-//   ServoWriteRequest_t request = {
-//     .header = { 0xFF, 0xFF },
-//     .id = id,
-//     .length = 0x04,
-//     .instruction = 0x03,
-//     .address = 0x30,
-//     .data = lock,
-//     .checksum = ~(id + 0x37 + lock)
-//   };
-
-//   Serial1.write((uint8_t*)&request, sizeof(ServoWriteRequest_t));
-//   servo_flush_clear();
-//   delay(100);
-// }
-
-// static void servo_overload_torque(const uint8_t id, const uint8_t torque) {
-
-//   ServoWriteRequest_t request = {
-//     .header = { 0xFF, 0xFF },
-//     .id = id,
-//     .length = 0x04,
-//     .instruction = 0x03,
-//     .address = 0x27,
-//     .data = torque,
-//     .checksum = ~(id + 0x2E + torque)
-//   };
-
-//   Serial1.write((uint8_t*)&request, sizeof(ServoWriteRequest_t));
-//   servo_flush_clear();
-// }
-
-// static void servo_protection_time(const uint8_t id, const uint8_t time) {
-
-//   ServoWriteRequest_t request = {
-//     .header = { 0xFF, 0xFF },
-//     .id = id,
-//     .length = 0x04,
-//     .instruction = 0x03,
-//     .address = 0x26,
-//     .data = time,
-//     .checksum = ~(id + 0x2D + time)
-//   };
-
-//   Serial1.write((uint8_t*)&request, sizeof(ServoWriteRequest_t));
-//   servo_flush_clear();
-// }
-
-// static void servo_protection_torque(const uint8_t id, const uint8_t torque) {
-
-//   ServoWriteRequest_t request = {
-//     .header = { 0xFF, 0xFF },
-//     .id = id,
-//     .length = 0x04,
-//     .instruction = 0x03,
-//     .address = 0x25,
-//     .data = torque,
-//     .checksum = ~(id + 0x2C + torque)
-//   };
-
-//   Serial1.write((uint8_t*)&request, sizeof(ServoWriteRequest_t));
-//   servo_flush_clear();
-// }
 
 static void servo_flush_clear(void) {
   Serial1.flush();
