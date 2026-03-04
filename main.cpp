@@ -16,7 +16,7 @@ void setup() {
     while (!Serial)
       ;
 
-  Serial.write("NANOHOLD R.E.G.A CLI\r\n-> Type '?' for commands.\r\n");
+  Serial.write("NANOHOLD R.E.G.A CLI\r\nType '?' for commands.\r\n");
 
   idle_power_wakeup();
 }
@@ -31,8 +31,12 @@ void loop() {
 }
 
 static inline void handle_serial_commands(void) {
+
   if (Serial.peek() != -1) {
     int cmd = Serial.read();
+
+    while (Serial.read() != -1)
+      ;
 
     printf("-> %c\r\n", cmd);
 
@@ -45,16 +49,14 @@ static inline void handle_serial_commands(void) {
                state.power, state.distance_mm, state.time_us);
         break;
       case '?':
-        Serial.write("'+' : Open\r\n'-' : Close\r\n'i' : Info\r\n'r' : Reset\r\n");
+        Serial.write("+ : Open\r\n- : Close\r\ni : Info\r\nr : Reset\r\n");
         break;
       default:
-        Serial.write("Unknown command. Type '?' for help.\r\n");
+        Serial.write("Unknown command. Type '?' for commands.\r\n");
         break;
     }
 
     Serial.flush();
-    while (Serial.read() != -1)
-      ;
   }
 }
 
