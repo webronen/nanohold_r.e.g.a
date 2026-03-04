@@ -41,15 +41,15 @@ static inline void handle_serial_commands(void) {
     printf("-> %c\r\n", cmd);
 
     switch (cmd) {
-      case '+': state.step = STEP_UP; break;
-      case '-': state.step = STEP_DOWN; break;
+      case 'o': state.step = STEP_UP; break;
+      case 'c': state.step = STEP_DOWN; break;
       case 'r': state.buttons = STEP_RESET; break;
       case 'i':
         printf(JSON_RESPONSE_TEMPLATE, state.mode, state.step,
                state.power, state.distance_mm, state.time_us);
         break;
       case '?':
-        Serial.write("+ : Open\r\n- : Close\r\ni : Info\r\nr : Reset\r\n");
+        Serial.write("o : Open\r\nc : Close\r\ni : Info\r\nr : Reset\r\n");
         break;
       default:
         Serial.write("Unknown command. Type '?' for commands.\r\n");
