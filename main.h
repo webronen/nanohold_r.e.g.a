@@ -9,7 +9,7 @@
 #define HZ_TO_US(hz) (1000000UL / (hz))
 #define M_TO_US(m) ((m)*60 * 1000000UL)
 #define S_TO_US(s) ((s)*1000000UL)
-#define JSON_RESPONSE_TEMPLATE "{\"time_us\":%lu,\"idle_us\":%lu,\"blink_us\":%lu,\"distance_mm\":%u,\"mode\":%d,\"step\":%d,\"buttons\":%d,\"press\":%d,\"latch\":%d,\"power\":%d,\"range\":%d}\r\n"
+#define JSON_RESPONSE_TEMPLATE "{\"mode\":%d,\"step\":%d,\"power\":%d,\"distance_mm\":%u,\"time_us\":%lu}\r\n"
 
 #define POWER_SAVE_TIMEOUT_M M_TO_US(1)
 #define SHUTDOWN_TIMEOUT_M M_TO_US(5)
