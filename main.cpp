@@ -12,6 +12,10 @@ void setup() {
 
   Serial.begin(SERIAL_BAUDRATE_1M);
 
+  if (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk)
+    while (!Serial)
+      ;
+
   idle_power_wakeup();
 }
 
@@ -31,12 +35,16 @@ static inline void handle_serial_commands(void) {
       case '-': state.step = STEP_DOWN; break;
       case 'r': state.buttons = STEP_RESET; break;
       case 's':
-        printf(JSON_RESPONSE_TEMPLATE, state.time_us, state.idle_us, state.blink_us,
-               state.distance_mm, state.mode, state.step, state.buttons, state.press,
-               state.latch, state.power, state.range);
+        printf(JSON_RESPONSE_TEMPLATE, state.mode, state.step,
+               state.power, state.distance_mm, state.time_us);
         break;
-      case '?': Serial.println("+=up, -=down, r=reset, s=state");
+      case '?': printf("+=up, -=down, r=reset, s=state\r\n"); break;
+      default: printf("Unknown command. Type '?' for help.\r\n"); break;
     }
+
+    Serial.flush();
+    while (Serial.read() != -1)
+      ;
   }
 }
 
