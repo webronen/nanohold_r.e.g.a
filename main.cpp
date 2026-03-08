@@ -348,5 +348,5 @@ static void servo_flush_clear(void) {
   Serial1.flush();
   while (Serial1.read() != -1)
     ;
-  delay(1);
+  delay(10);
 }
