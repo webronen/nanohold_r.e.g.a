@@ -10,15 +10,21 @@ void setup() {
   NRF_TIMER0->PRESCALER = TIMER_PRESCALER_PRESCALER_1MHZ;
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
 
+  idle_power_wakeup();
+
   Serial.begin(SERIAL_BAUDRATE_1M);
 
-  if (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk)
-    while (!Serial)
-      ;
+  if (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) {
+    NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
+    const uint32_t wait_us = NRF_TIMER0->CC[0];
 
-  Serial.write("NANOHOLD R.E.G.A CLI\r\nType '?' for commands.\r\n");
+    while (!Serial) {
+      NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
+      if ((NRF_TIMER0->CC[0] - wait_us) >= 1000000) break;
+    }
+  }
 
-  idle_power_wakeup();
+  Serial.write("NANOHOLD R.E.G.A CLI\r\nType ? for commands.\r\n");
 }
 
 void loop() {
@@ -48,12 +54,8 @@ static inline void handle_serial_commands(void) {
         printf(JSON_RESPONSE_TEMPLATE, state.mode, state.step,
                state.power, state.distance_mm, state.time_us);
         break;
-      case '?':
-        Serial.write("o : Open\r\nc : Close\r\ni : Info\r\nr : Reset\r\n");
-        break;
-      default:
-        Serial.write("Unknown command. Type '?' for commands.\r\n");
-        break;
+      case '?': Serial.write("o : Open\r\nc : Close\r\ni : Info\r\nr : Reset\r\n"); break;
+      default: Serial.write("Unknown command. Type ? for commands.\r\n"); break;
     }
 
     Serial.flush();
@@ -227,6 +229,7 @@ static inline void idle_detect(void) {
   if (state.range == RANGE_IDLE) {
     sensor.VL53L4CD_StartRanging();
     state.range = RANGE_ACTIVE;
+    detect_history = 0;
   }
 
   uint8_t is_data_ready;
@@ -245,10 +248,7 @@ static inline void idle_detect(void) {
         sensor.VL53L4CD_ClearInterruptAndStopRanging();
         state.range = RANGE_IDLE;
         state.mode = MODE_AUTO;
-        detect_history = 0;
       }
-    } else {
-      detect_history = 0;
     }
   }
 }
