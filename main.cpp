@@ -10,21 +10,8 @@ void setup() {
   NRF_TIMER0->PRESCALER = TIMER_PRESCALER_PRESCALER_1MHZ;
   NRF_TIMER0->TASKS_START = TIMER_TASKS_START_TASKS_START_Trigger;
 
-  idle_power_wakeup();
-
   Serial.begin(SERIAL_BAUDRATE_1M);
-
-  if (NRF_POWER->USBREGSTATUS & POWER_USBREGSTATUS_VBUSDETECT_Msk) {
-    NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
-    const uint32_t wait_us = NRF_TIMER0->CC[0];
-
-    while (!Serial) {
-      NRF_TIMER0->TASKS_CAPTURE[0] = TIMER_TASKS_CAPTURE_TASKS_CAPTURE_Trigger;
-      if ((NRF_TIMER0->CC[0] - wait_us) >= 1000000) break;
-    }
-  }
-
-  Serial.write("NANOHOLD R.E.G.A CLI\r\nType ? for commands.\r\n");
+  idle_power_wakeup();
 }
 
 void loop() {
@@ -212,6 +199,8 @@ static inline void idle_power_wakeup(void) {
     NRF_P0->OUT ^= (1UL << GPIO_STATUS_PIN);
     delayMicroseconds(8333);
   }
+
+  Serial.write("NANOHOLD R.E.G.A CLI\r\nType ? for commands.\r\n");
 
   sensor.VL53L4CD_SensorInit();
   sensor.VL53L4CD_StartRanging();
