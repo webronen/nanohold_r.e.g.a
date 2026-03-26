@@ -200,14 +200,14 @@ static inline void idle_power_wakeup(void) {
     delayMicroseconds(8333);
   }
 
-  Serial.write("NANOHOLD R.E.G.A CLI\r\nType ? for commands.\r\n");
-
   sensor.VL53L4CD_SensorInit();
   sensor.VL53L4CD_StartRanging();
 
   state.range = RANGE_ACTIVE;
   state.power = POWER_ACTIVE;
   state.idle_us = state.time_us;
+
+  Serial.write("NANOHOLD R.E.G.A CLI\r\nType ? for commands.\r\n");
 }
 
 static inline void idle_detect(void) {
